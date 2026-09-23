@@ -2,7 +2,7 @@
 支持直接导出立创eda文件，支持CAD导出，以及图片导出；\
 目前项目还有点bug但是不影响使用了；\
 支持单层和双层绕制，真正的商业化工具，不是立创扩展广场的那种\
-单击链接进行体验“https://zuodashuang-beep.github.io/NFC-draw-tool/%E7%AB%8B%E5%88%9B%E7%BA%BF%E5%9C%88%E5%B7%A5%E5%85%B7%20-%202/index.html”
+单击链接进行体验:https://zuodashuang-beep.github.io/NFC-draw-tool/%E7%AB%8B%E5%88%9B%E7%BA%BF%E5%9C%88%E5%B7%A5%E5%85%B7%20-%202/index.html
 
 # 以下正题
 项目出发点：由于公司最近开发这个类型的产品，招了一个硬件工程师，老是画出来的天线性能不达标；出于对公司负责的态度，做了这个工具\
