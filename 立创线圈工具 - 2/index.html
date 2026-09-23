@@ -1,0 +1,2855 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>立创线圈工具 · 圆形/矩形线圈</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --panel-2: #232d3a;
+      --line: #2e3a4a;
+      --text: #e7eef7;
+      --muted: #8fa0b3;
+      --accent: #2bb0a6;
+      --accent-2: #f0a202;
+      --danger: #e4572e;
+      --ok: #3dcc85;
+      --font: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --mono: "Cascadia Code", "Consolas", "Sarasa Mono SC", monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); }
+    body {
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #1a3a40 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #2a2418 0%, transparent 50%),
+        var(--bg);
+    }
+    .app {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 20px;
+      height: 100%;
+      padding: 16px;
+      max-width: 1800px;
+      margin: 0 auto;
+    }
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 1fr; height: auto; min-height: 100%; }
+      .canvas-wrap { grid-template-columns: 1fr; grid-template-areas: "toolbar" "alert" "stage" "side"; }
+    }
+    .panel {
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      overflow: auto;
+      backdrop-filter: blur(8px);
+    }
+    h1 { margin: 0 0 4px; font-size: 18px; font-weight: 650; }
+    .sub { margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .sec {
+      margin: 14px 0 8px;
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    input, select {
+      width: 100%;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: var(--mono);
+      outline: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+    .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    button {
+      border: 0; border-radius: 8px; padding: 9px 12px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      color: #06221f; background: var(--accent);
+    }
+    button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+    button.warn { background: var(--accent-2); color: #1a1400; }
+    button:hover { filter: brightness(1.08); }
+    .result {
+      background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: 10px; padding: 10px 12px; font-family: var(--mono);
+      font-size: 12px; line-height: 1.65; flex: 1;
+    }
+    .ok { color: var(--ok); } .warn { color: var(--accent-2); } .bad { color: var(--danger); } .muted { color: var(--muted); }
+    .canvas-wrap {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+      grid-template-areas:
+        "toolbar toolbar"
+        "alert   alert"
+        "stage   side";
+      gap: 10px;
+      min-height: 540px;
+    }
+    .canvas-wrap .toolbar { grid-area: toolbar; margin-bottom: 0; }
+    .canvas-wrap #rangeAlert { grid-area: alert; margin-bottom: 0; }
+    .canvas-wrap .stage { grid-area: stage; min-height: 480px; height: 100%; }
+    .canvas-wrap .right-bottom { grid-area: side; align-self: stretch; }
+    .right-bottom { display: flex; flex-direction: column; gap: 10px; }
+    .toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .toolbar .meta { color: var(--muted); font-size: 12px; font-family: var(--mono); }
+    .toolbar-main { min-width: 220px; text-align: right; }
+    .toolbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+    .view-switch { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: #111820; }
+    .view-switch button, .zoom-reset {
+      padding: 6px 10px; border-radius: 6px; font-size: 12px;
+    }
+    button.secondary.active {
+      border-color: var(--accent); color: #dffffc; background: #1c4d49;
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+    }
+    button:disabled { cursor: not-allowed; opacity: 0.42; filter: none; }
+    .clearance-note { margin-top: 4px; color: #9cccb2; font-size: 11px; }
+    .range-alert {
+      display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;
+      border: 1px solid #ff6b57; border-left-width: 5px; border-radius: 10px;
+      padding: 11px 13px; background: linear-gradient(90deg, #4c211f, #2a1c20);
+      color: #ffd6d0; font-size: 13px; font-weight: 650; line-height: 1.5;
+      box-shadow: 0 0 0 1px #ff6b5722, 0 8px 24px #0006;
+    }
+    .range-alert::before { content: "!"; flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #ff6b57; color: #25100d; font-weight: 900; }
+    .range-alert.warn-level { border-color: var(--accent-2); background: linear-gradient(90deg, #493817, #2a2419); color: #ffe8a5; }
+    .range-alert.warn-level::before { background: var(--accent-2); }
+    .range-alert[hidden] { display: none; }
+    .stage {
+      flex: 1; min-height: 520px;
+      background:
+        linear-gradient(0deg, transparent 24px, #1c2733 25px) 0 0 / 25px 25px,
+        linear-gradient(90deg, transparent 24px, #1c2733 25px) 0 0 / 25px 25px,
+        #0b0f14;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      touch-action: none;
+    }
+    .stage.range-error { border-color: #ff6b57; box-shadow: 0 0 0 2px #ff6b5733, inset 0 0 36px #e4572e18; }
+    #coilSvg { width: 100%; height: 100%; display: block; cursor: zoom-in; }
+    #coilSvg .drag-handle { cursor: grab; }
+    #coilSvg.dragging .drag-handle { cursor: grabbing; }
+    #coilSvg.panning { cursor: grabbing; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      background: #203039; color: var(--accent); font-size: 11px; margin-right: 6px;
+    }
+    .check {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px; font-size: 12px; color: var(--text);
+    }
+    .check input { width: auto; }
+    .board-circle-row { grid-template-columns: minmax(160px, 0.7fr) minmax(220px, 1.3fr); }
+    @media (max-width: 640px) {
+      .row, .board-circle-row { grid-template-columns: 1fr; }
+      .toolbar-actions { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="panel">
+      <h1>立创线圈工具</h1>
+      <div class="sec">线圈形状</div>
+      <select id="shape">
+        <option value="rect">矩形螺旋</option>
+        <option value="circle" selected>圆形线圈（同心回接）</option>
+      </select>
+
+      <div class="sec">芯片 / 谐振参考</div>
+      <div class="row">
+        <div>
+          <label>总等效电容 C (pF)</label>
+          <input id="capPf" type="number" min="0.1" step="0.1" value="68.9" />
+        </div>
+        <div>
+          <label>频率 f (MHz)</label>
+          <input id="freqMhz" type="number" min="0.01" step="0.01" value="13.56" />
+        </div>
+      </div>
+
+      <div class="sec">板框尺寸</div>
+      <div class="row" id="rectBoardRow">
+        <div>
+          <label>外宽 W (mm)</label>
+          <input id="outerW" type="number" min="2" step="0.1" value="30" />
+        </div>
+        <div>
+          <label>外高 H (mm)</label>
+          <input id="outerH" type="number" min="2" step="0.1" value="20" />
+        </div>
+      </div>
+      <div class="row board-circle-row" id="circleDiaRow">
+        <div>
+          <label>板框直径 D (mm)</label>
+          <input id="circleDia" type="number" min="1" step="0.1" value="18" />
+        </div>
+        <div>
+          <label>圆形板框说明</label>
+          <div id="circleDiaHint" style="padding-top:8px;color:var(--muted);font-size:12px">铜皮和过孔边缘距圆形板框至少 0.30 mm</div>
+        </div>
+      </div>
+
+      <div class="sec">走线 / 最大密度</div>
+      <div class="row">
+        <div>
+          <label>线宽 w (mm)</label>
+          <input id="widthMm" type="number" min="0.05" step="0.01" value="0.3" />
+        </div>
+        <div>
+          <label>最小间距 gap (mm)</label>
+          <input id="gapMm" type="number" min="0.05" step="0.001" value="0.127" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>倒角 (mm) 0=直角</label>
+          <input id="chamferMm" type="number" min="0" step="0.05" value="0.4" />
+        </div>
+        <div>
+          <label>方向</label>
+          <select id="dir">
+            <option value="cw" selected>顺时针向内</option>
+            <option value="ccw">逆时针向内</option>
+          </select>
+        </div>
+      </div>
+      <label class="check"><input id="maxDensity" type="checkbox" checked /> 按目标频率自动连续调匝（超出范围会限幅）</label>
+      <label class="check"><input id="dualLayer" type="checkbox" /> 双层交错绕制（底面观察同向）</label>
+      <div class="row" id="turnsRow" style="display:none">
+        <div>
+          <label>固定匝数 N</label>
+          <input id="turnsFixed" type="number" min="1" step="0.01" value="4" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>铜厚 (oz，仅影响 R/Q)</label>
+          <select id="copperOz"><option value="1" selected>1 oz</option><option value="2">2 oz</option></select>
+        </div>
+        <div>
+          <label>过孔/焊盘直径 (mm)</label>
+          <input id="padMm" type="number" min="0.3" step="0.1" value="0.5" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>起点栅格 (mm，仅拖动吸附)</label>
+          <input id="gridMm" type="number" min="0.001" step="0.001" value="0.127" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>起始位置</label>
+          <select id="startSide">
+            <option value="outer" selected>外侧</option>
+            <option value="inner">内侧</option>
+          </select>
+        </div>
+        <div>
+          <label>结束位置</label>
+          <select id="endSide">
+            <option value="outer" selected>外侧</option>
+            <option value="inner">内侧</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="btns">
+        <button id="btnSvg" class="secondary">导出 SVG</button>
+        <button id="btnDxf" class="secondary">导出 DXF</button>
+        <button id="btnEasy" class="warn">导出轨迹 JSON</button>
+      </div>
+    </aside>
+
+    <main class="panel canvas-wrap">
+      <div class="toolbar">
+        <div class="toolbar-actions">
+          <div class="view-switch" role="group" aria-label="线圈层视角">
+            <button id="viewAll" class="secondary active" type="button">全部</button>
+            <button id="viewTop" class="secondary" type="button">顶层</button>
+            <button id="viewBottom" class="secondary" type="button">底层</button>
+          </div>
+          <button id="resetZoom" class="secondary zoom-reset" type="button">适合窗口</button>
+          <div class="meta" id="zoomInfo">缩放 100%</div>
+        </div>
+        <div class="toolbar-main">
+          <div class="meta" id="status">就绪</div>
+          <div class="clearance-note">板边硬约束：线和过孔边缘 ≥ 0.30 mm</div>
+        </div>
+      </div>
+      <div id="rangeAlert" class="range-alert" role="alert" aria-live="assertive" hidden></div>
+      <div class="stage">
+        <svg id="coilSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"></svg>
+      </div>
+      <div class="right-bottom">
+        <div class="result" id="result">等待输入…</div>
+        <div class="hint"><span class="pill">滚轮</span>以指针为中心放大/缩小查看走线细节　<span class="pill">视角</span>在上方切换全部、顶层或底层；底层按板底观察方向显示　<span class="pill">拖动</span>移动橙色端点或紫色换层孔，松手后重算</div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const MU0 = 4 * Math.PI * 1e-7;
+    const BOARD_EDGE_CLEARANCE = 0.3;
+    // 额外 1 µm 抵消 SVG/DXF/JSON 坐标量化后向板外舍入的最坏误差。
+    const BOARD_EDGE_INSET = BOARD_EDGE_CLEARANCE + 0.001;
+    const MIN_TURNS = 1;
+    const TURN_RESOLUTION = 0.01;
+    const SETTINGS_KEY = "lc-coil-tool-settings-v10";
+    const SETTING_FIELDS = [
+      "capPf", "freqMhz", "outerW", "outerH", "widthMm", "gapMm",
+      "circleDia", "chamferMm", "dir", "maxDensity", "dualLayer", "turnsFixed", "copperOz", "padMm", "gridMm",
+      "startSide", "endSide", "shape"
+    ];
+    const $ = (id) => document.getElementById(id);
+
+    function formatTurns(value) {
+      return Number(value.toFixed(2)).toString();
+    }
+
+    let last = null;
+    let startPos = { x: 0, y: 0, userSet: false };
+    let innerStartPos = { x: 0, y: 0, userSet: false };
+    let layerViaPos = { x: 0, y: 0, userSet: false };
+    let dragging = false;
+    let dragTarget = null; // "terminal" | "layerVia"
+    let dragPreview = null; // {x,y} while dragging
+    let activeLayerView = "all";
+    let baseViewBox = null;
+    let cameraViewBox = null;
+    let panning = false;
+    let panStartClient = null; // {x, y}
+    let panStartViewBox = null; // {x, y, w, h}
+
+    function lnHFromLC(capPf, freqMhz) {
+      return 2.5330295e7 / (freqMhz * freqMhz * capPf);
+    }
+
+    function resonantFrequencyMHz(inductanceNh, capPf) {
+      if (!(inductanceNh > 0) || !(capPf > 0)) return NaN;
+      return Math.sqrt(2.5330295e7 / (inductanceNh * capPf));
+    }
+
+    function capacitanceForResonancePf(inductanceNh, freqMhz) {
+      if (!(inductanceNh > 0) || !(freqMhz > 0)) return NaN;
+      return 2.5330295e7 / (freqMhz * freqMhz * inductanceNh);
+    }
+
+    function inductanceRect_nH(n, wOuter, hOuter, wInner, hInner) {
+      const dout = Math.sqrt(wOuter * hOuter);
+      const din = Math.sqrt(Math.max(wInner, 0.01) * Math.max(hInner, 0.01));
+      const davg = 0.5 * (dout + din) * 1e-3;
+      const rho = (dout - din) / (dout + din);
+      if (!(rho > 0) || !(n > 0)) return 0;
+      const c1 = 1.27, c2 = 2.07, c3 = 0.18, c4 = 0.13;
+      const L = MU0 * n * n * davg * c1 / 2 * (Math.log(c2 / rho) + c3 * rho + c4 * rho * rho);
+      return L * 1e9;
+    }
+
+    function inductanceCircle_nH(n, Douter, Dinner) {
+      if (n <= 0 || Douter <= 0 || Dinner <= 0) return 0;
+      const davg = 0.5 * (Douter + Dinner) * 1e-3;
+      const rho = (Douter - Dinner) / (Douter + Dinner);
+      if (!(rho > 0) || !(rho < 1)) return 0;
+      const c1 = 1.00, c2 = 2.46, c3 = 0.00, c4 = 0.20;
+      const L = MU0 * n * n * davg * c1 / 2 * (Math.log(c2 / rho) + c3 * rho + c4 * rho * rho);
+      return L * 1e9;
+    }
+
+    function copperOuterSize(W, H, edgeClearance = BOARD_EDGE_INSET) {
+      return {
+        Wc: Math.max(W - 2 * edgeClearance, 0),
+        Hc: Math.max(H - 2 * edgeClearance, 0),
+      };
+    }
+
+    /** 吸附到导线最外圈中心线矩形 */
+    function projectToOuterCenterline(x, y, W, H, w, edgeClearance = BOARD_EDGE_INSET) {
+      const L = edgeClearance + w / 2, R = W - edgeClearance - w / 2;
+      const B = edgeClearance + w / 2, T = H - edgeClearance - w / 2;
+      const cands = [
+        { x: Math.min(Math.max(x, L), R), y: B },
+        { x: R, y: Math.min(Math.max(y, B), T) },
+        { x: Math.min(Math.max(x, L), R), y: T },
+        { x: L, y: Math.min(Math.max(y, B), T) },
+      ];
+      let best = cands[0], bestD = Infinity;
+      for (const c of cands) {
+        const d = Math.hypot(c.x - x, c.y - y);
+        if (d < bestD) { bestD = d; best = c; }
+      }
+      return best;
+    }
+
+    function snapToGrid(v, grid) {
+      return grid > 0 ? Math.round(v / grid) * grid : v;
+    }
+
+    function projectViaCenter(x, y, W, H, w, padMm, gridMm) {
+      // 板框净距是独立硬约束，不能复用可变的线间距 gap。
+      // 与孔相连的导线可能比孔更宽，中心需按两者较大半径内退。
+      const inset = BOARD_EDGE_INSET + Math.max(padMm, w) / 2;
+      const maxX = W - inset;
+      const maxY = H - inset;
+      // 只吸附沿板边的切向坐标；法向坐标保持精确 inset，才能真正用满外框面积。
+      const sx = Math.min(Math.max(snapToGrid(x, gridMm), inset), maxX);
+      const sy = Math.min(Math.max(snapToGrid(y, gridMm), inset), maxY);
+      const cands = [
+        { x: sx, y: inset },
+        { x: maxX, y: sy },
+        { x: sx, y: maxY },
+        { x: inset, y: sy },
+      ];
+      let best = cands[0], bestD = Infinity;
+      for (const c of cands) {
+        const d = Math.hypot(c.x - x, c.y - y);
+        if (d < bestD) { bestD = d; best = c; }
+      }
+      return best;
+    }
+
+    function defaultOuterBL(w, padMm, gridMm) {
+      const inset = BOARD_EDGE_INSET + Math.max(padMm, w) / 2;
+      return projectViaCenter(inset, inset, 9999, 9999, w, padMm, gridMm);
+    }
+
+    function adjacentOuterPad(anchor, W, H, w, gap, padMm, gridMm) {
+      const minStep = padMm * 1.5 + gap;
+      const step = gridMm > 0 ? Math.ceil(minStep / gridMm) * gridMm : minStep;
+      const inset = BOARD_EDGE_INSET + Math.max(padMm, w) / 2;
+      const distances = [
+        { side: "bottom", d: Math.abs(anchor.y - inset) },
+        { side: "right", d: Math.abs(anchor.x - (W - inset)) },
+        { side: "top", d: Math.abs(anchor.y - (H - inset)) },
+        { side: "left", d: Math.abs(anchor.x - inset) },
+      ].sort((a, b) => a.d - b.d);
+      const side = distances[0].side;
+      const candidates = [];
+      if (side === "bottom" || side === "top") {
+        candidates.push({ x: anchor.x + step, y: anchor.y }, { x: anchor.x - step, y: anchor.y });
+      } else {
+        candidates.push({ x: anchor.x, y: anchor.y + step }, { x: anchor.x, y: anchor.y - step });
+      }
+      for (const p of candidates) {
+        const q = projectViaCenter(p.x, p.y, W, H, w, padMm, gridMm);
+        if (Math.hypot(q.x - anchor.x, q.y - anchor.y) >= step - 1e-6) return q;
+      }
+      return projectViaCenter(candidates[0].x, candidates[0].y, W, H, w, padMm, gridMm);
+    }
+
+    function adjacentInnerPad(anchor, innerW, innerH, W, H, padMm, gap, gridMm) {
+      const minStep = padMm * 1.5 + gap;
+      const step = gridMm > 0 ? Math.ceil(minStep / gridMm) * gridMm : minStep;
+      const halfW = innerW / 2, halfH = innerH / 2;
+      const cx = W / 2, cy = H / 2;
+      const minX = cx - halfW + padMm / 2 + gap;
+      const maxX = cx + halfW - padMm / 2 - gap;
+      const minY = cy - halfH + padMm / 2 + gap;
+      const maxY = cy + halfH - padMm / 2 - gap;
+      const snap = (v) => snapToGrid(v, gridMm);
+      const candidates = [
+        { x: snap(anchor.x + step), y: snap(anchor.y) },
+        { x: snap(anchor.x - step), y: snap(anchor.y) },
+        { x: snap(anchor.x), y: snap(anchor.y + step) },
+        { x: snap(anchor.x), y: snap(anchor.y - step) },
+      ];
+      return candidates.find(p =>
+        p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY &&
+        Math.hypot(p.x - anchor.x, p.y - anchor.y) >= step - 1e-6
+      ) || { x: Math.min(Math.max(candidates[0].x, minX), maxX), y: Math.min(Math.max(candidates[0].y, minY), maxY) };
+    }
+
+    function projectInnerPad(x, y, innerW, innerH, W, H, padMm, gridMm) {
+      const minX = (W - innerW) / 2 + padMm / 2;
+      const maxX = (W + innerW) / 2 - padMm / 2;
+      const minY = (H - innerH) / 2 + padMm / 2;
+      const maxY = (H + innerH) / 2 - padMm / 2;
+      x = snapToGrid(x, gridMm);
+      y = snapToGrid(y, gridMm);
+      return {
+        x: Math.min(Math.max(x, minX), maxX),
+        y: Math.min(Math.max(y, minY), maxY),
+      };
+    }
+
+    function joinAtCrossing(topPts, bottomPts) {
+      const cross = (a, b, c, d) => {
+        const r = [b[0] - a[0], b[1] - a[1]];
+        const s = [d[0] - c[0], d[1] - c[1]];
+        const den = r[0] * s[1] - r[1] * s[0];
+        if (Math.abs(den) < 1e-9) return null;
+        const q = [c[0] - a[0], c[1] - a[1]];
+        const t = (q[0] * s[1] - q[1] * s[0]) / den;
+        const u = (q[0] * r[1] - q[1] * r[0]) / den;
+        if (t < -1e-9 || t > 1 + 1e-9 || u < -1e-9 || u > 1 + 1e-9) return null;
+        return { x: a[0] + t * r[0], y: a[1] + t * r[1], t, u };
+      };
+      let best = null;
+      for (let i = 1; i < topPts.length; i++) {
+        for (let j = 1; j < bottomPts.length; j++) {
+          const p = cross(topPts[i - 1], topPts[i], bottomPts[j - 1], bottomPts[j]);
+          if (!p) continue;
+          const score = (i - 1 + p.t) - (j - 1 + p.u);
+          if (!best || score > best.score) best = { ...p, i, j, score };
+        }
+      }
+      if (!best) return null;
+      const via = [best.x, best.y];
+      return {
+        top: [...topPts.slice(0, best.i), via],
+        bottom: [via, ...bottomPts.slice(best.j)],
+        via,
+      };
+    }
+
+    function joinAtParallelGap(topPts, bottomPts, options = {}) {
+      const { preferred = null, padMm = 0, w = 0, gap = 0, W = Infinity, H = Infinity } = options;
+      const project = (p, a, b) => {
+        const dx = b[0] - a[0], dy = b[1] - a[1];
+        const den = dx * dx + dy * dy;
+        const t = den > 0 ? Math.min(Math.max(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / den, 0), 1) : 0;
+        const q = [a[0] + t * dx, a[1] + t * dy];
+        return { q, t, distance: Math.hypot(p[0] - q[0], p[1] - q[1]) };
+      };
+      const pointSegmentDistance = (p, a, b) => project(p, a, b).distance;
+      const candidateIsClear = (via, topIndex, bottomIndex) => {
+        if (!(padMm > 0)) return true;
+        const edge = Math.max(padMm, w) / 2 + BOARD_EDGE_INSET;
+        if (via[0] < edge || via[0] > W - edge || via[1] < edge || via[1] > H - edge) return false;
+        const required = padMm / 2 + w / 2 + gap;
+        for (let k = 1; k < topPts.length; k++) {
+          if (Math.abs(k - topIndex) <= 1) continue;
+          if (pointSegmentDistance(via, topPts[k - 1], topPts[k]) < required - 1e-7) return false;
+        }
+        for (let k = 1; k < bottomPts.length; k++) {
+          if (Math.abs(k - bottomIndex) <= 1) continue;
+          if (pointSegmentDistance(via, bottomPts[k - 1], bottomPts[k]) < required - 1e-7) return false;
+        }
+        return true;
+      };
+      let best = null;
+      for (let i = 1; i < topPts.length; i++) {
+        const a = topPts[i - 1], b = topPts[i];
+        const adx = b[0] - a[0], ady = b[1] - a[1];
+        const alen = Math.hypot(adx, ady);
+        if (alen < 1e-9) continue;
+        for (let j = 1; j < bottomPts.length; j++) {
+          const c = bottomPts[j - 1], d = bottomPts[j];
+          const bdx = d[0] - c[0], bdy = d[1] - c[1];
+          const blen = Math.hypot(bdx, bdy);
+          if (blen < 1e-9) continue;
+          const parallel = Math.abs(adx * bdy - ady * bdx) / (alen * blen);
+          if (parallel > 0.08) continue;
+          const candidates = [];
+          for (const [p, ta] of [[a, 0], [b, 1]]) {
+            const hit = project(p, c, d);
+            candidates.push({ top: p, bottom: hit.q, ta, tb: hit.t, distance: hit.distance });
+          }
+          for (const [p, tb] of [[c, 0], [d, 1]]) {
+            const hit = project(p, a, b);
+            candidates.push({ top: hit.q, bottom: p, ta: hit.t, tb, distance: hit.distance });
+          }
+          if (preferred) {
+            const topHit = project([preferred.x, preferred.y], a, b);
+            const bottomHit = project([preferred.x, preferred.y], c, d);
+            candidates.push({
+              top: topHit.q, bottom: bottomHit.q,
+              ta: topHit.t, tb: bottomHit.t,
+              distance: Math.hypot(topHit.q[0] - bottomHit.q[0], topHit.q[1] - bottomHit.q[1]),
+            });
+          }
+          for (const candidate of candidates) {
+            if (candidate.distance < 1e-6) continue;
+            const progress = (i - 1 + candidate.ta) / Math.max(topPts.length - 1, 1);
+            const early = (j - 1 + candidate.tb) / Math.max(bottomPts.length - 1, 1);
+            const via = [(candidate.top[0] + candidate.bottom[0]) / 2, (candidate.top[1] + candidate.bottom[1]) / 2];
+            if (!candidateIsClear(via, i, j)) continue;
+            const preferredDistance = preferred ? Math.hypot(via[0] - preferred.x, via[1] - preferred.y) : 0;
+            const score = preferred
+              ? -preferredDistance * 100 - candidate.distance * 0.02 + progress * 1e-4
+              : progress - early - candidate.distance * 0.02;
+            if (!best || score > best.score) best = { ...candidate, i, j, via, score };
+          }
+        }
+      }
+      if (!best) return null;
+      const via = best.via || [(best.top[0] + best.bottom[0]) / 2, (best.top[1] + best.bottom[1]) / 2];
+      return {
+        top: [...topPts.slice(0, best.i), best.top, via],
+        bottom: [via, best.bottom, ...bottomPts.slice(best.j)],
+        via,
+        bridgeLength: best.distance,
+      };
+    }
+
+    function trimEndToPad(pts, pad) {
+      let best = null;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i];
+        const dx = b[0] - a[0], dy = b[1] - a[1];
+        const den = dx * dx + dy * dy;
+        const t = den > 0
+          ? Math.min(Math.max(((pad.x - a[0]) * dx + (pad.y - a[1]) * dy) / den, 0), 1)
+          : 0;
+        const q = [a[0] + t * dx, a[1] + t * dy];
+        const distance = Math.hypot(pad.x - q[0], pad.y - q[1]);
+        if (!best || distance < best.distance) best = { i, q, distance };
+      }
+      if (!best) return [...pts, [pad.x, pad.y]];
+      const result = [...pts.slice(0, best.i), best.q];
+      if (Math.hypot(pad.x - best.q[0], pad.y - best.q[1]) > 1e-9) result.push([pad.x, pad.y]);
+      return result;
+    }
+
+    function trimStartToPad(pts, pad) {
+      return trimEndToPad([...pts].reverse(), pad).reverse();
+    }
+
+    /** 在线段经过圆形禁布区时插入紧凑圆弧；跳过与过孔直接相连的线段。 */
+    function detourAroundCircle(pts, center, clearanceRadius, inward) {
+      const maxStep = Math.PI / 18; // 10°，兼顾紧凑和导出后的圆滑度
+      // 放大路径半径，补偿折线弦相对真实圆弧向内收缩的误差。
+      const routeRadius = clearanceRadius / Math.cos(maxStep / 2);
+      const out = [pts[0]];
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i];
+        const ax = a[0] - center.x, ay = a[1] - center.y;
+        const bx = b[0] - center.x, by = b[1] - center.y;
+        const aOutside = Math.hypot(ax, ay) >= routeRadius - 1e-9;
+        const bOutside = Math.hypot(bx, by) >= routeRadius - 1e-9;
+        const dx = b[0] - a[0], dy = b[1] - a[1];
+        const aa = dx * dx + dy * dy;
+        const bb = 2 * (ax * dx + ay * dy);
+        const cc = ax * ax + ay * ay - routeRadius * routeRadius;
+        const disc = bb * bb - 4 * aa * cc;
+        const inwardA = ax * inward[0] + ay * inward[1];
+        const inwardB = bx * inward[0] + by * inward[1];
+        // 只处理过孔内侧的相邻匝；过孔所在的连接导线保持直连。
+        if (i > 2 && Math.max(inwardA, inwardB) > 1e-6 && aOutside && bOutside && aa > 1e-12 && disc > 1e-12) {
+          const root = Math.sqrt(disc);
+          const t1 = (-bb - root) / (2 * aa), t2 = (-bb + root) / (2 * aa);
+          if (t1 > 1e-8 && t2 < 1 - 1e-8) {
+            const p1 = [a[0] + dx * t1, a[1] + dy * t1];
+            const p2 = [a[0] + dx * t2, a[1] + dy * t2];
+            // 以两个净空交点为直径画真正的 180° 半圆，而不是沿禁布圆画一小段浅圆角。
+            const arcCenter = { x: (p1[0] + p2[0]) / 2, y: (p1[1] + p2[1]) / 2 };
+            const arcRadius = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 2;
+            const angle1 = Math.atan2(p1[1] - arcCenter.y, p1[0] - arcCenter.x);
+            const midScore = (delta) => {
+              const m = angle1 + delta / 2;
+              return Math.cos(m) * inward[0] + Math.sin(m) * inward[1];
+            };
+            const delta = midScore(Math.PI) >= midScore(-Math.PI) ? Math.PI : -Math.PI;
+            const steps = Math.max(2, Math.ceil(Math.abs(delta) / maxStep));
+            out.push(p1);
+            for (let j = 1; j < steps; j++) {
+              const angle = angle1 + delta * j / steps;
+              out.push([arcCenter.x + arcRadius * Math.cos(angle), arcCenter.y + arcRadius * Math.sin(angle)]);
+            }
+            out.push(p2, b);
+            continue;
+          }
+        }
+        out.push(b);
+      }
+      return out;
+    }
+
+    function windingPitch(w, gap, dualLayer) {
+      return w + gap;
+    }
+
+    function innerHoleSize(Wc, Hc, n, w, gap, dualLayer = false) {
+      const used = 2 * w + 2 * Math.max(n - 1, 0) * windingPitch(w, gap, dualLayer);
+      return {
+        innerW: Math.max(Wc - used, 0),
+        innerH: Math.max(Hc - used, 0),
+      };
+    }
+
+    /**
+     * 从外侧起点画向内矩形螺旋。
+     * start 在最外圈中心线上；默认左下角。
+     */
+    function buildRectSpiral({ W, H, w, gap, turns, chamfer, dir, startX, startY, padMm, gridMm, dualLayer = false, outerInset = BOARD_EDGE_INSET }) {
+      const pitch = windingPitch(w, gap, dualLayer);
+      const pts = [];
+      const turnStarts = [];
+
+      function addRaw(x, y) {
+        x = Math.min(Math.max(x, outerInset + w / 2), W - outerInset - w / 2);
+        y = Math.min(Math.max(y, outerInset + w / 2), H - outerInset - w / 2);
+        if (!pts.length || Math.hypot(x - pts.at(-1)[0], y - pts.at(-1)[1]) > 1e-9) pts.push([x, y]);
+      }
+      function add(x, y) {
+        addRaw(x, y);
+      }
+      function ch(seg) {
+        if (!(chamfer > 0)) return 0;
+        return Math.min(chamfer, seg * 0.49);
+      }
+      // 0=bottom 1=right 2=top 3=left
+      function sideOf(p, L, R, B, T) {
+        const db = Math.abs(p.y - B), dr = Math.abs(p.x - R), dt = Math.abs(p.y - T), dl = Math.abs(p.x - L);
+        const m = Math.min(db, dr, dt, dl);
+        if (m === db) return 0;
+        if (m === dr) return 1;
+        if (m === dt) return 2;
+        return 3;
+      }
+      function sideFrac(p, sid, L, R, B, T) {
+        if (dir === "cw") {
+          if (sid === 0) return (p.x - L) / (R - L);
+          if (sid === 1) return (p.y - B) / (T - B);
+          if (sid === 2) return (R - p.x) / (R - L);
+          return (T - p.y) / (T - B);
+        }
+        if (sid === 0) return (R - p.x) / (R - L);
+        if (sid === 3) return (p.y - B) / (T - B);
+        if (sid === 2) return (p.x - L) / (R - L);
+        return (T - p.y) / (T - B);
+      }
+      function sidePointAt(sid, frac, L, R, B, T) {
+        frac = Math.min(Math.max(frac, 0), 1);
+        if (dir === "cw") {
+          if (sid === 0) return [L + (R - L) * frac, B];
+          if (sid === 1) return [R, B + (T - B) * frac];
+          if (sid === 2) return [R - (R - L) * frac, T];
+          return [L, T - (T - B) * frac];
+        }
+        if (sid === 0) return [R - (R - L) * frac, B];
+        if (sid === 3) return [L, B + (T - B) * frac];
+        if (sid === 2) return [L + (R - L) * frac, T];
+        return [R, T - (T - B) * frac];
+      }
+      function addSide(sid, L, R, B, T, cx, cy, finishFrac) {
+        if (finishFrac !== null) {
+          const [x, y] = sidePointAt(sid, finishFrac, L, R, B, T);
+          add(x, y);
+          return;
+        }
+
+        if (dir === "cw") {
+          if (sid === 0) {
+            add(R - cx, B);
+            add(R, B + cy);
+          } else if (sid === 1) {
+            add(R, T - cy);
+            add(R - cx, T);
+          } else if (sid === 2) {
+            add(L + cx, T);
+            add(L, T - cy);
+          } else {
+            add(L, B + cy);
+            add(L + cx, B);
+          }
+        } else {
+          if (sid === 0) {
+            add(L + cx, B);
+            add(L, B + cy);
+          } else if (sid === 3) {
+            add(L, T - cy);
+            add(L + cx, T);
+          } else if (sid === 2) {
+            add(R - cx, T);
+            add(R, T - cy);
+          } else {
+            add(R, B + cy);
+            add(R - cx, B);
+          }
+        }
+      }
+      function nextSideFrom(sid) {
+        return dir === "cw" ? (sid + 1) % 4 : (sid + 3) % 4;
+      }
+      function addInsetTransition(sid, L, R, B, T) {
+        const c = Math.min(chamfer > 0 ? chamfer : 0, pitch * 0.49);
+        if (dir === "cw") {
+          if (sid === 0) {
+            add(R - pitch - c, B);
+            add(R - pitch, B + c);
+            add(R - pitch, B + pitch);
+          } else if (sid === 1) {
+            add(R, T - pitch - c);
+            add(R - c, T - pitch);
+            add(R - pitch, T - pitch);
+          } else if (sid === 2) {
+            add(L + pitch + c, T);
+            add(L + pitch, T - c);
+            add(L + pitch, T - pitch);
+          } else {
+            add(L, B + pitch + c);
+            add(L + c, B + pitch);
+            add(L + pitch, B + pitch);
+          }
+        } else {
+          if (sid === 0) {
+            add(L + pitch + c, B);
+            add(L + pitch, B + c);
+            add(L + pitch, B + pitch);
+          } else if (sid === 3) {
+            add(L, T - pitch - c);
+            add(L + c, T - pitch);
+            add(L + pitch, T - pitch);
+          } else if (sid === 2) {
+            add(R - pitch - c, T);
+            add(R - pitch, T - c);
+            add(R - pitch, T - pitch);
+          } else {
+            add(R, B + pitch + c);
+            add(R - c, B + pitch);
+            add(R - pitch, B + pitch);
+          }
+        }
+      }
+      function sideStartPoint(sid, L, R, B, T) {
+        if (dir === "cw") {
+          if (sid === 0) return [L, B];
+          if (sid === 1) return [R, B];
+          if (sid === 2) return [R, T];
+          return [L, T];
+        }
+        if (sid === 0) return [R, B];
+        if (sid === 3) return [L, B];
+        if (sid === 2) return [L, T];
+        return [R, T];
+      }
+      function pointOnSide(sid, x, y, L, R, B, T) {
+        if (sid === 0) return { x: Math.min(Math.max(x, L), R), y: B };
+        if (sid === 1) return { x: R, y: Math.min(Math.max(y, B), T) };
+        if (sid === 2) return { x: Math.min(Math.max(x, L), R), y: T };
+        return { x: L, y: Math.min(Math.max(y, B), T) };
+      }
+      function sideForward(sid) {
+        if (dir === "cw") {
+          if (sid === 0) return [1, 0];
+          if (sid === 1) return [0, 1];
+          if (sid === 2) return [-1, 0];
+          return [0, -1];
+        }
+        if (sid === 0) return [-1, 0];
+        if (sid === 3) return [0, 1];
+        if (sid === 2) return [1, 0];
+        return [0, -1];
+      }
+      function sideInward(sid) {
+        if (sid === 0) return [0, 1];
+        if (sid === 1) return [-1, 0];
+        if (sid === 2) return [0, -1];
+        return [1, 0];
+      }
+      function addStartLead(via, sid, keepout, L, R, B, T) {
+        const [fx, fy] = sideForward(sid);
+        const lead = keepout;
+        const p1 = { x: via.x + fx * lead, y: via.y + fy * lead };
+        const entry = pointOnSide(sid, p1.x, p1.y, L, R, B, T);
+        add(via.x, via.y);
+        add(p1.x, p1.y);
+        add(entry.x, entry.y);
+        return entry;
+      }
+      let L = outerInset + w / 2, R = W - outerInset - w / 2, B = outerInset + w / 2, T = H - outerInset - w / 2;
+      const via = projectViaCenter(startX, startY, W, H, w, padMm, gridMm);
+      const projected = projectToOuterCenterline(via.x, via.y, W, H, w, outerInset);
+      let side = sideOf(projected, L, R, B, T);
+      const viaSide = side;
+      const viaKeepout = padMm / 2 + gap + w / 2;
+      // 保持最外圈贴近板框的原始中心线；不能因过孔圆心内缩而把整条边一起内推。
+      // 过孔只通过短引线接入，内侧相邻匝由局部半圆负责 DRC 避让。
+      const routeStart = addStartLead(via, side, viaKeepout, L, R, B, T);
+      const startFrac = sideFrac(routeStart, side, L, R, B, T);
+      const finishFrac = Math.min(Math.max(startFrac, 0.15), 0.85);
+
+      for (let turn = 0; turn < turns; turn++) {
+        turnStarts.push(Math.max(pts.length - 1, 0));
+        const ww = R - L, hh = T - B;
+        if (ww < pitch * 0.9 || hh < pitch * 0.9) break;
+        const cx = ch(ww), cy = ch(hh);
+        const more = turn < turns - 1;
+        const cwOrder = [0, 1, 2, 3];
+        const ccwOrder = [0, 3, 2, 1];
+        const order = dir === "cw" ? cwOrder : ccwOrder;
+        let startIdx = order.indexOf(side);
+        if (startIdx < 0) startIdx = 0;
+
+        for (let k = 0; k < 4; k++) {
+          const sid = order[(startIdx + k) % 4];
+          const isLast = k === 3;
+
+          if (isLast && more) {
+            addInsetTransition(sid, L, R, B, T);
+            const nextSide = nextSideFrom(sid);
+            L += pitch;
+            R -= pitch;
+            B += pitch;
+            T -= pitch;
+            const [nx, ny] = sideStartPoint(nextSide, L, R, B, T);
+            add(nx, ny);
+            side = nextSide;
+          } else {
+            addSide(sid, L, R, B, T, cx, cy, isLast && !more ? finishFrac : null);
+          }
+        }
+
+        if (!more) break;
+      }
+
+      const inward = sideInward(viaSide);
+      const routedPts = detourAroundCircle(pts, via, viaKeepout, inward);
+      const runs = [{
+        layer: "TopLayer",
+        pts: routedPts,
+      }];
+      const transitionVias = dualLayer
+        ? turnStarts.slice(1).map(index => [...pts[index]])
+        : [];
+      return { pts: routedPts, runs, transitionVias, snap: via, routeStart };
+    }
+
+    /**
+     * 最大面积矩形螺旋：所有匝在端子附近共用一个开口，并在开口内以端子为圆心逐匝换线。
+     * 每匝的四条主体边仍严格位于理想 inset 上，不再为过孔整体内缩某一条边。
+     */
+    function buildRectSpiralMaxArea({ W, H, w, gap, turns, chamfer, dir, startX, startY, padMm, gridMm, outerInset = BOARD_EDGE_INSET }) {
+      const pitch = windingPitch(w, gap, false);
+      const wholeTurns = Math.floor(turns + 1e-9);
+      const fractionalPart = turns - wholeTurns;
+      const contourCount = Math.max(1, Math.ceil(turns - 1e-9));
+      const finalContourFraction = fractionalPart > 1e-9 ? fractionalPart : 1;
+      const maxArcStep = Math.PI / 36; // 5°
+      // 相邻圆弧采用独立分段，顶点角度不一定完全对齐；用 1.25 个
+      // 采样步长作保守弦误差补偿，保证折线实体中心距仍不小于 pitch。
+      const chordScale = 1 / Math.cos(maxArcStep * 1.25);
+      const padToTraceClearance = padMm / 2 + gap + w / 2;
+      const clearanceRadius = padToTraceClearance * chordScale;
+      let firstRadius = clearanceRadius;
+      const radiusPitch = pitch * chordScale;
+      const pts = [];
+      const add = (p) => {
+        if (!pts.length || Math.hypot(p[0] - pts.at(-1)[0], p[1] - pts.at(-1)[1]) > 1e-9) pts.push(p);
+      };
+      const sideForward = (side) => {
+        if (dir === "cw") return side === 0 ? [1, 0] : side === 1 ? [0, 1] : side === 2 ? [-1, 0] : [0, -1];
+        return side === 0 ? [-1, 0] : side === 3 ? [0, 1] : side === 2 ? [1, 0] : [0, -1];
+      };
+      const sideInward = (side) => side === 0 ? [0, 1] : side === 1 ? [-1, 0] : side === 2 ? [0, -1] : [1, 0];
+      const boundsAt = (turn) => ({
+        L: outerInset + w / 2 + turn * pitch,
+        R: W - outerInset - w / 2 - turn * pitch,
+        B: outerInset + w / 2 + turn * pitch,
+        T: H - outerInset - w / 2 - turn * pitch,
+      });
+      const sideOf = (p, b) => {
+        const ds = [Math.abs(p.y - b.B), Math.abs(p.x - b.R), Math.abs(p.y - b.T), Math.abs(p.x - b.L)];
+        return ds.indexOf(Math.min(...ds));
+      };
+      const baseOnSide = (side, b, via) => {
+        if (side === 0) return [Math.min(Math.max(via.x, b.L), b.R), b.B];
+        if (side === 1) return [b.R, Math.min(Math.max(via.y, b.B), b.T)];
+        if (side === 2) return [Math.min(Math.max(via.x, b.L), b.R), b.T];
+        return [b.L, Math.min(Math.max(via.y, b.B), b.T)];
+      };
+      const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+      const offsetPoint = (base, tangent, amount) => [base[0] + tangent[0] * amount, base[1] + tangent[1] * amount];
+      const cornerCut = (b) => Math.min(Math.max(chamfer, 0), (b.R - b.L) * 0.49, (b.T - b.B) * 0.49);
+
+      // 顶/底层共用同一个真实多层端子；底层线圈可错开，但端子不能跟随 outerInset 漂移。
+      let via = projectViaCenter(startX, startY, W, H, w, padMm, gridMm);
+      const b0 = boundsAt(0);
+      const side = sideOf(via, b0);
+      const tangent = sideForward(side);
+      const inward = sideInward(side);
+
+      // 底层错开后，首条内匝可能已在基础净空圆之外；换匝半径至少要同时穿过相邻两匝。
+      const firstBase = baseOnSide(side, b0, via);
+      const firstNormal = dot([firstBase[0] - via.x, firstBase[1] - via.y], inward);
+      if (contourCount > 1) {
+        const secondBase = baseOnSide(side, boundsAt(1), via);
+        const secondNormal = dot([secondBase[0] - via.x, secondBase[1] - via.y], inward);
+        firstRadius = Math.max(padToTraceClearance, Math.abs(firstNormal), Math.abs(secondNormal)) * chordScale + 1e-6;
+      }
+      const terminalRadius = contourCount === 1
+        ? (padMm + gap) * chordScale
+        : firstRadius + (contourCount - 2) * radiusPitch + clearanceRadius;
+
+      // 求所有匝开口在直边（扣除倒角）上的共同可行区间。
+      let terminalMin = -Infinity, terminalMax = Infinity;
+      const tangentSign = side === 0 || side === 2 ? tangent[0] : tangent[1];
+      for (let i = 0; i < contourCount; i++) {
+        const b = boundsAt(i);
+        const base = baseOnSide(side, b, via);
+        const normal = dot([base[0] - via.x, base[1] - via.y], inward);
+        const beforeR = firstRadius + Math.max(i - 1, 0) * radiusPitch;
+        const afterR = i === contourCount - 1 ? terminalRadius : firstRadius + i * radiusPitch;
+        const hStart = i === 0 ? 0 : Math.sqrt(Math.max(beforeR * beforeR - normal * normal, 0));
+        const hEnd = Math.sqrt(Math.max(afterR * afterR - normal * normal, 0));
+        const offsets = [tangentSign * hStart, -tangentSign * hEnd];
+        const c = cornerCut(b);
+        const lo = side === 0 || side === 2 ? b.L + c : b.B + c;
+        const hi = side === 0 || side === 2 ? b.R - c : b.T - c;
+        terminalMin = Math.max(terminalMin, ...offsets.map(offset => lo - offset));
+        terminalMax = Math.min(terminalMax, ...offsets.map(offset => hi - offset));
+      }
+      if (terminalMin > terminalMax) {
+        return {
+          invalid: "当前匝数的共同开口无法放入直边，请减少匝数或移动端子。",
+          pts: [], runs: [], transitionVias: [], snap: via, routeStart: { x: via.x, y: via.y },
+        };
+      }
+      if (side === 0 || side === 2) {
+        via.x = snapToGrid(via.x, gridMm);
+        via.x = Math.min(Math.max(via.x, terminalMin), terminalMax);
+      } else {
+        via.y = snapToGrid(via.y, gridMm);
+        via.y = Math.min(Math.max(via.y, terminalMin), terminalMax);
+      }
+
+      const addCornerToNextSide = (sid, b) => {
+        const c = cornerCut(b);
+        if (dir === "cw") {
+          if (sid === 0) { add([b.R - c, b.B]); add([b.R, b.B + c]); }
+          else if (sid === 1) { add([b.R, b.T - c]); add([b.R - c, b.T]); }
+          else if (sid === 2) { add([b.L + c, b.T]); add([b.L, b.T - c]); }
+          else { add([b.L, b.B + c]); add([b.L + c, b.B]); }
+        } else {
+          if (sid === 0) { add([b.L + c, b.B]); add([b.L, b.B + c]); }
+          else if (sid === 3) { add([b.L, b.T - c]); add([b.L + c, b.T]); }
+          else if (sid === 2) { add([b.R - c, b.T]); add([b.R, b.T - c]); }
+          else { add([b.R, b.B + c]); add([b.R - c, b.B]); }
+        }
+      };
+      const appendArc = (from, to, radius) => {
+        const a1 = Math.atan2(from[1] - via.y, from[0] - via.x);
+        const a2 = Math.atan2(to[1] - via.y, to[0] - via.x);
+        const ccw = ((a2 - a1) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        const cw = ccw - 2 * Math.PI;
+        const score = (delta) => {
+          const mid = a1 + delta / 2;
+          return Math.cos(mid) * inward[0] + Math.sin(mid) * inward[1];
+        };
+        const delta = score(ccw) >= score(cw) ? ccw : cw;
+        const steps = Math.max(2, Math.ceil(Math.abs(delta) / maxArcStep));
+        for (let j = 1; j < steps; j++) {
+          const a = a1 + delta * j / steps;
+          add([via.x + radius * Math.cos(a), via.y + radius * Math.sin(a)]);
+        }
+        add(to);
+      };
+
+      // 小数末圈会停在轮廓的任意位置。若直接把大于线宽的终端焊盘放在
+      // 该点，焊盘会向外吃到上一匝。沿当前线段的内法线引入内孔后再落盘，
+      // 使焊盘外缘与其余轮廓仍至少保留 gap；这段径向引线不计入匝数。
+      const appendFractionalTerminalLead = (b) => {
+        const end = pts.at(-1);
+        // 安全矩形位于最内轮廓之内；焊盘中心落入这里后，对该轮廓的四边
+        // 都有 pad/2 + gap + w/2 的中心线距离。拐角附近必须同时收紧 X/Y，
+        // 只沿单一法线移动会让焊盘擦到相邻的那条边。
+        const minX = b.L + padToTraceClearance + 1e-6;
+        const maxX = b.R - padToTraceClearance - 1e-6;
+        const minY = b.B + padToTraceClearance + 1e-6;
+        const maxY = b.T - padToTraceClearance - 1e-6;
+        if (minX > maxX || minY > maxY) return false;
+
+        const pointSegmentDistance = (p, a, c) => {
+          const dx = c[0] - a[0], dy = c[1] - a[1];
+          const length2 = dx * dx + dy * dy;
+          const t = length2 > 0
+            ? Math.min(Math.max(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length2, 0), 1)
+            : 0;
+          return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+        };
+        const orient = (a, c, p) => (c[0] - a[0]) * (p[1] - a[1]) - (c[1] - a[1]) * (p[0] - a[0]);
+        const segmentDistance = (a, c, p, q) => {
+          const crosses = orient(a, c, p) * orient(a, c, q) < -1e-12 &&
+            orient(p, q, a) * orient(p, q, c) < -1e-12;
+          return crosses ? 0 : Math.min(
+            pointSegmentDistance(a, p, q), pointSegmentDistance(c, p, q),
+            pointSegmentDistance(p, a, c), pointSegmentDistance(q, a, c)
+          );
+        };
+        const place = (x, y) => [
+          Math.min(Math.max(snapToGrid(x, gridMm), minX), maxX),
+          Math.min(Math.max(snapToGrid(y, gridMm), minY), maxY),
+        ];
+
+        // 与终点紧邻的一小段本来就是同一条连续引线，检查新引线时跳过；
+        // 其余旧铜皮必须保留一个完整 pitch，终端焊盘则检查更大的焊盘净空。
+        let nonLocalEnd = pts.length - 1;
+        let localLength = 0;
+        while (nonLocalEnd > 1 && localLength < padToTraceClearance) {
+          localLength += Math.hypot(
+            pts[nonLocalEnd][0] - pts[nonLocalEnd - 1][0],
+            pts[nonLocalEnd][1] - pts[nonLocalEnd - 1][1]
+          );
+          nonLocalEnd--;
+        }
+        const candidates = [];
+        const pushCandidate = (x, y) => {
+          const p = place(x, y);
+          if (!candidates.some(q => Math.hypot(p[0] - q[0], p[1] - q[1]) < 1e-9)) candidates.push(p);
+        };
+        pushCandidate(end[0], end[1]);
+        pushCandidate(W / 2, H / 2);
+        for (let ix = 0; ix <= 8; ix++) for (let iy = 0; iy <= 8; iy++) {
+          pushCandidate(minX + (maxX - minX) * ix / 8, minY + (maxY - minY) * iy / 8);
+        }
+
+        let best = null;
+        for (const candidate of candidates) {
+          let padClear = Infinity;
+          for (let i = 1; i < pts.length; i++) {
+            padClear = Math.min(padClear, pointSegmentDistance(candidate, pts[i - 1], pts[i]));
+          }
+          if (padClear < padToTraceClearance - 1e-7) continue;
+          let leadClear = Infinity;
+          for (let i = 1; i <= nonLocalEnd; i++) {
+            leadClear = Math.min(leadClear, segmentDistance(end, candidate, pts[i - 1], pts[i]));
+          }
+          if (leadClear < pitch - 1e-7) continue;
+          const leadLength = Math.hypot(candidate[0] - end[0], candidate[1] - end[1]);
+          if (!best || leadLength < best.leadLength) best = { candidate, leadLength };
+        }
+        if (!best) return false;
+        add(best.candidate);
+        return true;
+      };
+
+      let routeStart = null;
+      for (let turn = 0; turn < contourCount; turn++) {
+        const b = boundsAt(turn);
+        if (b.R <= b.L || b.T <= b.B) break;
+        const base = baseOnSide(side, b, via);
+        const normal = dot([base[0] - via.x, base[1] - via.y], inward);
+        const beforeRadius = firstRadius + Math.max(turn - 1, 0) * radiusPitch;
+        const afterRadius = turn === contourCount - 1 ? terminalRadius : firstRadius + turn * radiusPitch;
+        const hStart = turn === 0 ? 0 : Math.sqrt(Math.max(beforeRadius * beforeRadius - normal * normal, 0));
+        // 最内匝也停在下一条同心边界之外，避免终端线段穿过上一条换匝圆弧。
+        const hEnd = Math.sqrt(Math.max(afterRadius * afterRadius - normal * normal, 0));
+        const start = offsetPoint(base, tangent, hStart);
+        const end = offsetPoint(base, tangent, -hEnd);
+
+        if (turn === 0) {
+          add([via.x, via.y]);
+          add(start);
+          routeStart = { x: start[0], y: start[1] };
+        }
+
+        const contourStartIndex = Math.max(pts.length - 1, 0);
+        const order = [];
+        for (let k = 0, sid = side; k < 4; k++, sid = dir === "cw" ? (sid + 1) % 4 : (sid + 3) % 4) order.push(sid);
+        for (const sid of order) addCornerToNextSide(sid, b);
+        add(end);
+
+        if (turn === contourCount - 1 && finalContourFraction < 1 - 1e-9) {
+          const generated = pts.slice(contourStartIndex);
+          const lengths = [];
+          let total = 0;
+          for (let i = 1; i < generated.length; i++) {
+            const len = Math.hypot(generated[i][0] - generated[i - 1][0], generated[i][1] - generated[i - 1][1]);
+            lengths.push(len);
+            total += len;
+          }
+          const target = total * finalContourFraction;
+          const clipped = [generated[0]];
+          let walked = 0;
+          for (let i = 1; i < generated.length; i++) {
+            const len = lengths[i - 1];
+            if (walked + len >= target - 1e-12) {
+              const t = len > 0 ? Math.max(0, Math.min(1, (target - walked) / len)) : 0;
+              clipped.push([
+                generated[i - 1][0] + (generated[i][0] - generated[i - 1][0]) * t,
+                generated[i - 1][1] + (generated[i][1] - generated[i - 1][1]) * t,
+              ]);
+              break;
+            }
+            clipped.push(generated[i]);
+            walked += len;
+          }
+          pts.splice(contourStartIndex, pts.length - contourStartIndex, ...clipped);
+          if (!appendFractionalTerminalLead(b)) {
+            return {
+              invalid: "内孔不足以放置小数匝终端焊盘，请减少匝数或减小焊盘/间距。",
+              pts: [], runs: [], transitionVias: [], snap: via, routeStart: routeStart || { x: via.x, y: via.y },
+            };
+          }
+          break;
+        }
+
+        if (turn < contourCount - 1) {
+          const nextB = boundsAt(turn + 1);
+          const nextBase = baseOnSide(side, nextB, via);
+          const nextNormal = dot([nextBase[0] - via.x, nextBase[1] - via.y], inward);
+          const nextHalf = Math.sqrt(Math.max(afterRadius * afterRadius - nextNormal * nextNormal, 0));
+          const nextStart = offsetPoint(nextBase, tangent, nextHalf);
+          appendArc(end, nextStart, afterRadius);
+        }
+      }
+
+      return {
+        pts,
+        runs: [{ layer: "TopLayer", pts }],
+        transitionVias: [],
+        snap: via,
+        routeStart: routeStart || { x: via.x, y: via.y },
+      };
+    }
+
+    /**
+     * 求指定矩形边上"共同开口过孔"的切向可行区间。
+     *
+     * 双层双端内侧时，顶/底层必须共用同一个外侧换层孔。过去两层各自
+     * 在 buildRectSpiralMaxArea 内夹紧端子位置；靠近角部时两层得到的
+     * snap 不同，调用方再把两条路径强行接到平均点，便会把换匝弧拉成交叉。
+     * 这里复用同一套半径与倒角约束，先显式求区间，供两层取交集。
+     */
+    function rectOpeningViaInterval({ W, H, w, gap, turns, chamfer, dir, padMm, outerInset, side }) {
+      const pitch = windingPitch(w, gap, false);
+      const contourCount = Math.max(1, Math.ceil(turns - 1e-9));
+      const maxArcStep = Math.PI / 36;
+      const chordScale = 1 / Math.cos(maxArcStep * 1.25);
+      const padToTrace = padMm / 2 + gap + w / 2;
+      const clearanceRadius = padToTrace * chordScale;
+      const radiusPitch = pitch * chordScale;
+      const viaInset = BOARD_EDGE_INSET + Math.max(padMm, w) / 2;
+      const via = side === 0 ? { x: 0, y: viaInset }
+        : side === 1 ? { x: W - viaInset, y: 0 }
+        : side === 2 ? { x: 0, y: H - viaInset }
+        : { x: viaInset, y: 0 };
+      const boundsAt = (i) => ({
+        L: outerInset + w / 2 + i * pitch,
+        R: W - outerInset - w / 2 - i * pitch,
+        B: outerInset + w / 2 + i * pitch,
+        T: H - outerInset - w / 2 - i * pitch,
+      });
+      const inward = side === 0 ? [0, 1] : side === 1 ? [-1, 0] : side === 2 ? [0, -1] : [1, 0];
+      const normalAt = (b) => side === 0 ? b.B - via.y
+        : side === 1 ? via.x - b.R
+        : side === 2 ? via.y - b.T
+        : b.L - via.x;
+      const tangentSign = dir === "cw"
+        ? (side === 0 || side === 1 ? 1 : -1)
+        : (side === 0 || side === 1 ? -1 : 1);
+
+      const b0 = boundsAt(0);
+      const firstNormal = normalAt(b0);
+      const secondNormal = contourCount > 1 ? normalAt(boundsAt(1)) : firstNormal;
+      const firstRadius = contourCount > 1
+        ? Math.max(padToTrace, Math.abs(firstNormal), Math.abs(secondNormal)) * chordScale + 1e-6
+        : clearanceRadius;
+      const terminalRadius = contourCount === 1
+        ? (padMm + gap) * chordScale
+        : firstRadius + (contourCount - 2) * radiusPitch + clearanceRadius;
+
+      let loAll = viaInset;
+      let hiAll = (side === 0 || side === 2 ? W : H) - viaInset;
+      for (let i = 0; i < contourCount; i++) {
+        const b = boundsAt(i);
+        if (!(b.R > b.L && b.T > b.B)) return null;
+        const normal = normalAt(b);
+        const beforeR = firstRadius + Math.max(i - 1, 0) * radiusPitch;
+        const afterR = i === contourCount - 1 ? terminalRadius : firstRadius + i * radiusPitch;
+        // 圆与当前 inset 直线必须真实相交。不能用 sqrt(max(..., 0))
+        // 把无交点伪装成切点，否则角部会生成折返/交叉的假开口。
+        if ((i > 0 && beforeR < Math.abs(normal) - 1e-9) || afterR < Math.abs(normal) - 1e-9) return null;
+        const hStart = i === 0 ? 0 : Math.sqrt(Math.max(beforeR * beforeR - normal * normal, 0));
+        const hEnd = Math.sqrt(Math.max(afterR * afterR - normal * normal, 0));
+        const offsets = [tangentSign * hStart, -tangentSign * hEnd];
+        const c = Math.min(Math.max(chamfer, 0), (b.R - b.L) * 0.49, (b.T - b.B) * 0.49);
+        const lo = side === 0 || side === 2 ? b.L + c : b.B + c;
+        const hi = side === 0 || side === 2 ? b.R - c : b.T - c;
+        loAll = Math.max(loAll, ...offsets.map(offset => lo - offset));
+        hiAll = Math.min(hiAll, ...offsets.map(offset => hi - offset));
+        if (loAll > hiAll + 1e-9) return null;
+      }
+      return { side, min: loAll, max: hiAll, inward };
+    }
+
+    /** 将请求位置投影到顶/底两层共同可行的最近外框边段。 */
+    function projectRectCommonOpeningVia({ W, H, w, gap, turns, chamfer, topDir, bottomDir, padMm, gridMm, bottomInset, x, y, lockRequestedSide = false }) {
+      const requested = projectViaCenter(x, y, W, H, w, padMm, gridMm);
+      const viaInset = BOARD_EDGE_INSET + Math.max(padMm, w) / 2;
+      const requestedDistances = [
+        Math.abs(requested.y - viaInset),
+        Math.abs(requested.x - (W - viaInset)),
+        Math.abs(requested.y - (H - viaInset)),
+        Math.abs(requested.x - viaInset),
+      ];
+      const requestedSide = requestedDistances.indexOf(Math.min(...requestedDistances));
+      let best = null;
+      for (let side = 0; side < 4; side++) {
+        // 用户拖动后保持他选中的那条边：该边无共同区间时返回 null，
+        // 由自动调匝寻找较少匝的可布解，避免孔突然跳到另一条边。
+        if (lockRequestedSide && side !== requestedSide) continue;
+        const top = rectOpeningViaInterval({
+          W, H, w, gap, turns, chamfer, dir: topDir, padMm, outerInset: BOARD_EDGE_INSET, side,
+        });
+        const bottom = rectOpeningViaInterval({
+          W, H, w, gap, turns, chamfer, dir: bottomDir, padMm, outerInset: bottomInset, side,
+        });
+        if (!top || !bottom) continue;
+        const lo = Math.max(top.min, bottom.min);
+        const hi = Math.min(top.max, bottom.max);
+        if (lo > hi + 1e-9) continue;
+        const requestedTangent = side === 0 || side === 2 ? requested.x : requested.y;
+        // buildRectSpiralMaxArea 会再次做栅格吸附，因此这里必须选交集内
+        // 的真实栅格点；若先夹到一个非栅格边界，二次吸附会使两层再次漂移。
+        const gridLo = gridMm > 0 ? Math.ceil((lo - 1e-9) / gridMm) * gridMm : lo;
+        const gridHi = gridMm > 0 ? Math.floor((hi + 1e-9) / gridMm) * gridMm : hi;
+        if (gridLo > gridHi + 1e-9) continue;
+        const snapped = snapToGrid(requestedTangent, gridMm);
+        const tangent = Math.min(Math.max(snapped, gridLo), gridHi);
+        const candidate = side === 0 ? { x: tangent, y: viaInset }
+          : side === 1 ? { x: W - viaInset, y: tangent }
+          : side === 2 ? { x: tangent, y: H - viaInset }
+          : { x: viaInset, y: tangent };
+        const distance = Math.hypot(candidate.x - requested.x, candidate.y - requested.y);
+        if (!best || distance < best.distance - 1e-9) best = { ...candidate, side, distance };
+      }
+      return best;
+    }
+
+    function projectInnerTransitionVia(x, y, innerW, innerH, W, H, padMm, gap, gridMm) {
+      const clearance = padMm / 2 + gap;
+      const minX = (W - innerW) / 2 + clearance;
+      const maxX = (W + innerW) / 2 - clearance;
+      const minY = (H - innerH) / 2 + clearance;
+      const maxY = (H + innerH) / 2 - clearance;
+      if (minX > maxX || minY > maxY) return null;
+      x = snapToGrid(x, gridMm);
+      y = snapToGrid(y, gridMm);
+      return {
+        x: Math.min(Math.max(x, minX), maxX),
+        y: Math.min(Math.max(y, minY), maxY),
+      };
+    }
+
+    function routeInsideInnerHole(from, to, innerW, innerH, W, H) {
+      const minX = (W - innerW) / 2, maxX = (W + innerW) / 2;
+      const minY = (H - innerH) / 2, maxY = (H + innerH) / 2;
+      const distances = [
+        { side: "left", d: Math.abs(from[0] - minX) },
+        { side: "right", d: Math.abs(from[0] - maxX) },
+        { side: "bottom", d: Math.abs(from[1] - minY) },
+        { side: "top", d: Math.abs(from[1] - maxY) },
+      ].sort((a, b) => a.d - b.d);
+      const side = distances[0].side;
+      const bend = side === "left" || side === "right" ? [to[0], from[1]] : [from[0], to[1]];
+      const result = [[...from]];
+      if (Math.hypot(bend[0] - from[0], bend[1] - from[1]) > 1e-9) result.push(bend);
+      if (Math.hypot(to[0] - result.at(-1)[0], to[1] - result.at(-1)[1]) > 1e-9) result.push([...to]);
+      return result;
+    }
+
+    /** 返回共同开口与末端焊盘都能落在直边上的最大矩形匝数。 */
+    function maxRectTurnsWithOpening({ W, H, w, gap, padMm, chamfer, dir, startX, startY, outerInset, limit }) {
+      const pitch = w + gap;
+      const maxArcStep = Math.PI / 36;
+      const chordScale = 1 / Math.cos(maxArcStep * 1.25);
+      const padToTrace = padMm / 2 + gap + w / 2;
+      const via = projectViaCenter(startX, startY, W, H, w, padMm, 0);
+      const boundsAt = (i) => ({
+        L: outerInset + w / 2 + i * pitch, R: W - outerInset - w / 2 - i * pitch,
+        B: outerInset + w / 2 + i * pitch, T: H - outerInset - w / 2 - i * pitch,
+      });
+      const b0 = boundsAt(0);
+      const distances = [Math.abs(via.y - b0.B), Math.abs(via.x - b0.R), Math.abs(via.y - b0.T), Math.abs(via.x - b0.L)];
+      const side = distances.indexOf(Math.min(...distances));
+      const tangentSign = dir === "cw"
+        ? (side === 0 || side === 1 ? 1 : -1)
+        : (side === 0 || side === 1 ? -1 : 1);
+      const normalAt = (b) => side === 0 ? b.B - via.y : side === 1 ? via.x - b.R : side === 2 ? via.y - b.T : b.L - via.x;
+      let best = 0;
+      for (let turns = 1; turns <= limit; turns++) {
+        const firstNormal = normalAt(boundsAt(0));
+        const secondNormal = turns > 1 ? normalAt(boundsAt(1)) : firstNormal;
+        const firstRadius = turns > 1
+          ? Math.max(padToTrace, Math.abs(firstNormal), Math.abs(secondNormal)) * chordScale + 1e-6
+          : padToTrace * chordScale;
+        const radiusPitch = pitch * chordScale;
+        const terminalRadius = turns === 1
+          ? (padMm + gap) * chordScale
+          : firstRadius + (turns - 2) * radiusPitch + padToTrace * chordScale;
+        let loAll = -Infinity, hiAll = Infinity, feasible = true;
+        for (let i = 0; i < turns; i++) {
+          const b = boundsAt(i);
+          if (!(b.R > b.L && b.T > b.B)) { feasible = false; break; }
+          const normal = normalAt(b);
+          const beforeR = firstRadius + Math.max(i - 1, 0) * radiusPitch;
+          const afterR = i === turns - 1 ? terminalRadius : firstRadius + i * radiusPitch;
+          if (i < turns - 1) {
+            const nextB = boundsAt(i + 1);
+            const clearsOpposite = side === 0 ? via.y + afterR <= nextB.T - pitch + 1e-9
+              : side === 1 ? via.x - afterR >= nextB.L + pitch - 1e-9
+              : side === 2 ? via.y - afterR >= nextB.B + pitch - 1e-9
+              : via.x + afterR <= nextB.R - pitch + 1e-9;
+            if (!clearsOpposite) { feasible = false; break; }
+          }
+          const hStart = i === 0 ? 0 : Math.sqrt(Math.max(beforeR * beforeR - normal * normal, 0));
+          const hEnd = Math.sqrt(Math.max(afterR * afterR - normal * normal, 0));
+          const offsets = [tangentSign * hStart, -tangentSign * hEnd];
+          const c = Math.min(Math.max(chamfer, 0), (b.R - b.L) * 0.49, (b.T - b.B) * 0.49);
+          const lo = side === 0 || side === 2 ? b.L + c : b.B + c;
+          const hi = side === 0 || side === 2 ? b.R - c : b.T - c;
+          loAll = Math.max(loAll, ...offsets.map(offset => lo - offset));
+          hiAll = Math.min(hiAll, ...offsets.map(offset => hi - offset));
+          if (loAll > hiAll) { feasible = false; break; }
+        }
+        if (!feasible) break;
+        best = turns;
+      }
+      return best;
+    }
+
+    /**
+     * 生成圆形线圈：同心圆弧在开口处逐匝回接。
+     * 单层采用标准的"内端在中心、外端在线圈外侧"拓扑，避免外端同层回中心时穿越绕组；
+     * 双层则由调用方把两层外端接到同一个换层孔，两个自由端仍留在中心。
+     */
+    function buildCircleSpiral({ W, H, w, gap, turns, dir, startX, startY, padMm, gridMm, dualLayer = false, outerInset = BOARD_EDGE_INSET, outerDiameter = null, radialOrder = 'inner-out', terminalStart = null, terminalEnd = null }) {
+      const { Wc, Hc } = copperOuterSize(W, H, outerInset);
+      const cx = W / 2;
+      const cy = H / 2;
+      // outerDiameter/outerR 表示铜皮实体的安全包络；真正的走线中心线还要内退 w/2。
+      const boardCopperR = Math.min(Wc, Hc) / 2;
+      const outerR = outerDiameter > 0 ? Math.min(boardCopperR, outerDiameter / 2) : boardCopperR;
+      const outerTraceR = Math.max(outerR - w / 2, 0.01);
+      const pitch = windingPitch(w, gap, dualLayer);
+      const safeTurns = Math.max(Number(turns) || 0, 0.01);
+      const wholeTurns = Math.floor(safeTurns + 1e-9);
+      const fractionalPart = safeTurns - wholeTurns;
+      const hasFraction = fractionalPart > 1e-9;
+      const ringCount = Math.max(1, wholeTurns + (hasFraction ? 1 : 0));
+      const pts = [];
+      const startAngle = Math.atan2(startY - cy, startX - cx);
+      // 不足一整匝的圆弧放在最内圈；这样无论小数部分多大，完整外圈都继续用满设定外径。
+      const innerR = Math.max(outerTraceR - (ringCount - 1) * pitch, Math.max(w / 2, 0.01));
+      const radial = [Math.cos(startAngle), Math.sin(startAngle)];
+      const tangent = [-radial[1], radial[0]];
+      const point = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+      const outerTerminalMode = !terminalEnd && radialOrder === 'inner-out';
+      const padToTraceClearance = padMm / 2 + gap + w / 2;
+      const keepoutArcStep = Math.PI / 36;
+      const padKeepoutRadius = padToTraceClearance / Math.cos(keepoutArcStep / 2);
+      // 焊盘和走线分别按自身半径内退，二者实体外缘共用同一安全包络。
+      const outerTerminalRadius = Math.max(outerR - Math.max(padMm, w) / 2, 0.01);
+      const outerTerminalSideAngle = Math.min(0.18, Math.max(0.045, padKeepoutRadius / Math.max(outerTraceR, padKeepoutRadius)));
+      const outerTerminalAngle = startAngle - outerTerminalSideAngle;
+      const outerTerminal = point(outerTerminalRadius, outerTerminalAngle);
+      const outerGap = Math.min(0.08, Math.max(0.035, (padMm + gap) / Math.max(2 * outerTraceR, 0.01)));
+      // 换匝区只占约一个节距的切向宽度，避免回接弧大幅伸进线圈内孔。
+      const transitionSpan = Math.min(0.12, Math.max(0.035,
+        pitch * 0.95 / Math.max(innerR, pitch)
+      ));
+      const gapAngles = (index) => {
+        // 仅保留轻微的内宽外窄，使逐匝回接形成紧凑扇形而不是大拱桥。
+        const q = ringCount > 1 ? 1 - index / (ringCount - 1) : 1;
+        const r = innerR + index * pitch;
+        let terminalKeepoutAngle = 0;
+        if (outerTerminalMode && r > 0 && outerTerminalRadius > 0) {
+          const cosine = (r * r + outerTerminalRadius * outerTerminalRadius - padKeepoutRadius * padKeepoutRadius)
+            / (2 * r * outerTerminalRadius);
+          if (cosine < 1) terminalKeepoutAngle = Math.acos(Math.max(-1, cosine)) + 1e-4;
+        }
+        return {
+          right: Math.max(outerGap + transitionSpan * Math.pow(q, 0.75), terminalKeepoutAngle - outerTerminalSideAngle),
+          left: Math.max(outerGap + transitionSpan * 0.65 * Math.pow(q, 1.35), terminalKeepoutAngle + outerTerminalSideAngle),
+        };
+      };
+
+      const transitionAroundOuterPad = (p0, p2) => {
+        // 在开口扇区内用极坐标 smoothstep 改变半径：两端 dr/dθ=0，
+        // 因而与前后同心圆弧切向连续，不再出现圆形模式原来的尖折角。
+        const smoothBridge = [];
+        const normPositive = (a) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        const a0 = Math.atan2(p0[1] - cy, p0[0] - cx);
+        const a2 = Math.atan2(p2[1] - cy, p2[0] - cx);
+        const deltaAngle = normPositive(a2 - a0);
+        const r0 = Math.hypot(p0[0] - cx, p0[1] - cy);
+        const r2 = Math.hypot(p2[0] - cx, p2[1] - cy);
+        const bendSteps = 32;
+        for (let i = 1; i <= bendSteps; i++) {
+          const t = i / bendSteps;
+          const eased = t * t * (3 - 2 * t);
+          const r = r0 + (r2 - r0) * eased;
+          const a = a0 + deltaAngle * t;
+          smoothBridge.push(point(r, a));
+        }
+        if (!outerTerminalMode || smoothBridge.every(p => Math.hypot(p[0] - outerTerminal[0], p[1] - outerTerminal[1]) >= padKeepoutRadius - 1e-9)) {
+          return smoothBridge;
+        }
+
+        const tangentAngles = (p) => {
+          const dx = p[0] - outerTerminal[0], dy = p[1] - outerTerminal[1];
+          const d = Math.hypot(dx, dy);
+          if (d < padKeepoutRadius - 1e-8) return [];
+          const base = Math.atan2(dy, dx);
+          const offset = Math.acos(Math.min(1, padKeepoutRadius / Math.max(d, padKeepoutRadius)));
+          return [base - offset, base + offset];
+        };
+        const a0s = tangentAngles(p0), a2s = tangentAngles(p2);
+        let best = null;
+        const pointSegmentDistance = (p, a, b) => {
+          const dx = b[0] - a[0], dy = b[1] - a[1];
+          const den = dx * dx + dy * dy;
+          const t = den > 0 ? Math.min(1, Math.max(0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / den)) : 0;
+          return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+        };
+        const segmentDistance = (a, b, c, d) => {
+          const orient = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+          if (orient(a, b, c) * orient(a, b, d) < -1e-12 && orient(c, d, a) * orient(c, d, b) < -1e-12) return 0;
+          return Math.min(pointSegmentDistance(a, c, d), pointSegmentDistance(b, c, d), pointSegmentDistance(c, a, b), pointSegmentDistance(d, a, b));
+        };
+        const outerEndAngles = gapAngles(ringCount - 1);
+        const terminalLeadStart = point(outerTraceR, startAngle - outerEndAngles.left);
+        for (const a0 of a0s) for (const a2 of a2s) {
+          const ccw = normPositive(a2 - a0);
+          for (const delta of [ccw, ccw - 2 * Math.PI]) {
+            if (Math.abs(delta) > Math.PI + 1e-9) continue;
+            const mid = a0 + delta / 2;
+            // 换匝桥固定绕焊盘的开口右侧，把左侧完整留给"外圈末端→焊盘"引线。
+            const sideScore = Math.cos(mid) * tangent[0] + Math.sin(mid) * tangent[1];
+            const outwardScore = Math.cos(mid) * radial[0] + Math.sin(mid) * radial[1];
+            const t0 = [outerTerminal[0] + padKeepoutRadius * Math.cos(a0), outerTerminal[1] + padKeepoutRadius * Math.sin(a0)];
+            const t2 = [outerTerminal[0] + padKeepoutRadius * Math.cos(a2), outerTerminal[1] + padKeepoutRadius * Math.sin(a2)];
+            const length = Math.hypot(t0[0] - p0[0], t0[1] - p0[1])
+              + Math.abs(delta) * padKeepoutRadius
+              + Math.hypot(p2[0] - t2[0], p2[1] - t2[1]);
+            const steps = Math.max(2, Math.ceil(Math.abs(delta) / keepoutArcStep));
+            const candidate = [p0, t0];
+            for (let i = 1; i < steps; i++) {
+              const a = a0 + delta * i / steps;
+              candidate.push([outerTerminal[0] + padKeepoutRadius * Math.cos(a), outerTerminal[1] + padKeepoutRadius * Math.sin(a)]);
+            }
+            candidate.push(t2, p2);
+            if (candidate.some(p => Math.hypot(p[0] - cx, p[1] - cy) > outerTraceR + 1e-8)) continue;
+            let leadClearance = Infinity;
+            for (let i = 1; i < candidate.length; i++) {
+              leadClearance = Math.min(leadClearance, segmentDistance(candidate[i - 1], candidate[i], terminalLeadStart, outerTerminal));
+            }
+            let minSide = Infinity;
+            for (const p of candidate) minSide = Math.min(minSide, (p[0] - outerTerminal[0]) * tangent[0] + (p[1] - outerTerminal[1]) * tangent[1]);
+            const score = minSide * 10000 + sideScore * 1000 + leadClearance * 100 + outwardScore * 10 - length;
+            if (!best || score > best.score) best = { routed: candidate.slice(1), score };
+          }
+        }
+        if (!best) return smoothBridge;
+        return best.routed;
+      };
+
+      // 物理圆环按内→外编号；小数圆弧始终占用 index=0 的最内圈。
+      // inner-out 时先画小数弧再画完整外圈；outer-in 时顺序反过来，保证双层外侧换层点稳定。
+      const ringIndices = Array.from({ length: ringCount }, (_, i) =>
+        radialOrder === 'outer-in' ? ringCount - 1 - i : i
+      );
+      const arcForIndex = (index) => {
+        const angles = gapAngles(index);
+        const fullStart = startAngle + angles.right;
+        const fullSweep = 2 * Math.PI - angles.right - angles.left;
+        const partial = hasFraction && index === 0;
+        if (!partial) return { start: fullStart, sweep: fullSweep, end: fullStart + fullSweep };
+
+        const sweep = fullSweep * fractionalPart;
+        if (radialOrder === 'inner-out') {
+          // 从内向外时让小数弧终止在开口左侧，随后可在开口内跨到下一完整圈。
+          const end = startAngle + 2 * Math.PI - angles.left;
+          return { start: end - sweep, sweep, end };
+        }
+        // 从外向内时，小数弧从开口右侧开始；弧尾可直接在内孔接终端。
+        return { start: fullStart, sweep, end: fullStart + sweep };
+      };
+      let outerArcStart = null;
+      let outerArcEnd = null;
+      const firstArc = arcForIndex(ringIndices[0]);
+      const firstTerminal = terminalStart || [cx, cy];
+      pts.push(firstTerminal);
+      const appendSmoothInnerLead = (from, to, endAngle) => {
+        const distance = Math.hypot(to[0] - from[0], to[1] - from[1]);
+        if (distance < 1e-9) return;
+        const ux = (to[0] - from[0]) / distance, uy = (to[1] - from[1]) / distance;
+        const endTangent = [-Math.sin(endAngle), Math.cos(endAngle)];
+        const c1 = [from[0] + ux * distance * 0.42, from[1] + uy * distance * 0.42];
+        const endHandle = Math.min(distance * 0.28, Math.max(pitch * 0.8, w));
+        const c2 = [to[0] - endTangent[0] * endHandle, to[1] - endTangent[1] * endHandle];
+        const steps = 28;
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps, u = 1 - t;
+          pts.push([
+            u*u*u*from[0] + 3*u*u*t*c1[0] + 3*u*t*t*c2[0] + t*t*t*to[0],
+            u*u*u*from[1] + 3*u*u*t*c1[1] + 3*u*t*t*c2[1] + t*t*t*to[1],
+          ]);
+        }
+      };
+      for (let orderIndex = 0; orderIndex < ringIndices.length; orderIndex++) {
+        const index = ringIndices[orderIndex];
+        const r = innerR + index * pitch;
+        const arc = arcForIndex(index);
+        if (index === ringCount - 1) {
+          outerArcStart = point(r, arc.start);
+          outerArcEnd = point(r, arc.end);
+        }
+
+        const arcStartPoint = point(r, arc.start);
+        if (orderIndex === 0 && radialOrder === 'inner-out') appendSmoothInnerLead(firstTerminal, arcStartPoint, arc.start);
+        else pts.push(arcStartPoint);
+        const arcSteps = Math.max(2, Math.ceil(arc.sweep * r / 0.12));
+        for (let i = 1; i <= arcSteps; i++) pts.push(point(r, arc.start + arc.sweep * i / arcSteps));
+
+        if (orderIndex + 1 < ringIndices.length) {
+          // 本圈左端跨到下一圈右端，过渡弧留在开口内；所有大圆弧仍同向。
+          const nextIndex = ringIndices[orderIndex + 1];
+          const nextR = innerR + nextIndex * pitch;
+          const nextArc = arcForIndex(nextIndex);
+          const p0 = point(r, arc.end);
+          const p2 = point(nextR, nextArc.start);
+          for (const p of transitionAroundOuterPad(p0, p2)) pts.push(p);
+        }
+      }
+      if (terminalEnd) {
+        pts.push(terminalEnd);
+      } else if (radialOrder === 'inner-out') {
+        pts.push(outerTerminal);
+      } else if (radialOrder !== 'inner-out') {
+        pts.push([cx, cy]);
+      }
+
+      // 改变方向时只整体反转连续路径，绝不逐匝交替反向。
+      if (dir === 'cw') pts.reverse();
+
+      const routeStart_pt = point(outerTraceR, startAngle);
+      return {
+        pts,
+        runs: [{ layer: "TopLayer", pts }],
+        transitionVias: [],
+        snap: [cx, cy], routeStart: routeStart_pt, center: [cx, cy], outerR, outerTraceR,
+        outerArcStart, outerArcEnd, outerTerminal, innerR,
+        innerCopperR: Math.max(innerR - w / 2, 0.005), ringCount, fractionalPart
+      };
+    }
+
+    function maxTurns({ W, H, w, gap, padMm, dualLayer = false, outerInset = BOARD_EDGE_INSET, outerDiameter = null, shape = 'rect' }) {
+      if (shape === 'circle') {
+        const { Wc, Hc } = copperOuterSize(W, H, outerInset);
+        const boardCopperR = Math.min(Wc, Hc) / 2;
+        const outerR = outerDiameter > 0 ? Math.min(boardCopperR, outerDiameter / 2) : boardCopperR;
+        const outerTraceR = outerR - w / 2;
+        const pitch = windingPitch(w, gap, dualLayer);
+        const centerTerminalOffset = dualLayer ? (padMm + gap) / 2 : 0;
+        const minimumInnerTraceR = centerTerminalOffset + padMm / 2 + gap + w / 2;
+        let n = Math.floor((outerTraceR - minimumInnerTraceR) / pitch + 1 + 1e-9);
+        n = Math.min(Math.max(n, 0), 80);
+        return n;
+      }
+      const { Wc, Hc } = copperOuterSize(W, H, outerInset);
+      let n = 0;
+      for (let i = 1; i <= 80; i++) {
+        const { innerW, innerH } = innerHoleSize(Wc, Hc, i, w, gap, dualLayer);
+        if (innerW < gap || innerH < gap) break;
+        n = i;
+      }
+      return Math.max(n, 1);
+    }
+
+    function autoTurnsForTarget({ W, H, w, gap, nMax, capPf, freqMhz, dualLayer = false, outerDiameter = null, shape = 'rect' }) {
+      const frequencyAt = (n) => {
+        let Lgeo;
+        if (shape === 'circle') {
+          const { Wc, Hc } = copperOuterSize(W, H, BOARD_EDGE_INSET);
+          const boardCopperR = Math.min(Wc, Hc) / 2;
+          const outerR = outerDiameter > 0 ? Math.min(boardCopperR, outerDiameter / 2) : boardCopperR;
+          const pitch = windingPitch(w, gap, dualLayer);
+          const innerR = outerR - w - Math.max(n - 1, 0) * pitch;
+          const innerREff = dualLayer ? innerR - pitch / 2 : innerR;
+          Lgeo = inductanceCircle_nH(dualLayer ? n * 2 : n, outerR * 2, Math.max(innerREff * 2, 0.01));
+        } else {
+          const { Wc, Hc } = copperOuterSize(W, H, BOARD_EDGE_INSET);
+          const { innerW, innerH } = innerHoleSize(Wc, Hc, n, w, gap, dualLayer);
+          Lgeo = inductanceRect_nH(dualLayer ? n * 2 : n, Wc, Hc, innerW, innerH);
+        }
+        return resonantFrequencyMHz(Lgeo, capPf);
+      };
+
+      const minTurns = Math.min(MIN_TURNS, nMax);
+      const maxTurns = Math.max(MIN_TURNS, nMax);
+      // 接近满铺时经验公式不保证全区间严格单调，不能用单一二分根。
+      // 直接在导出精度 0.01 匝上比较全部候选，确保拿到真实频差最小值。
+      const firstUnit = Math.ceil(minTurns / TURN_RESOLUTION - 1e-9);
+      const lastUnit = Math.floor(maxTurns / TURN_RESOLUTION + 1e-9);
+      let best = minTurns;
+      let bestError = Math.abs(frequencyAt(best) - freqMhz);
+      for (let unit = firstUnit; unit <= lastUnit; unit++) {
+        const candidate = Number((unit * TURN_RESOLUTION).toFixed(2));
+        const error = Math.abs(frequencyAt(candidate) - freqMhz);
+        if (Number.isFinite(error) && error < bestError - 1e-12) {
+          best = candidate;
+          bestError = error;
+        }
+      }
+      if (Math.abs(maxTurns - lastUnit * TURN_RESOLUTION) > 1e-9) {
+        const maxError = Math.abs(frequencyAt(maxTurns) - freqMhz);
+        if (Number.isFinite(maxError) && maxError < bestError - 1e-12) best = maxTurns;
+      }
+      return Number(best.toFixed(2));
+    }
+
+    function pathLength(pts) {
+      let L = 0;
+      for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      return L;
+    }
+
+    function estimateRdc(lenMm, widthMm, oz) {
+      const t = oz * 35e-6;
+      return 1.72e-8 * (lenMm * 1e-3) / (widthMm * 1e-3 * t);
+    }
+
+    function setExportEnabled(enabled) {
+      ["btnSvg", "btnDxf", "btnEasy"].forEach(id => { $(id).disabled = !enabled; });
+    }
+
+    function clearRangeAlert() {
+      const alert = $("rangeAlert");
+      alert.hidden = true;
+      alert.textContent = "";
+      alert.classList.remove("warn-level");
+      document.querySelector(".stage")?.classList.remove("range-error");
+    }
+
+    function showRangeAlert(message, level = "error") {
+      const alert = $("rangeAlert");
+      alert.textContent = message;
+      alert.hidden = false;
+      alert.classList.toggle("warn-level", level === "warn");
+      document.querySelector(".stage")?.classList.add("range-error");
+    }
+
+    function failCalculation(message, status = "无法生成线圈") {
+      last = null;
+      dragPreview = null;
+      dragging = false;
+      setExportEnabled(false);
+      showRangeAlert(message, "error");
+      $("result").innerHTML = `<span class="bad">${message}</span>`;
+      $("status").textContent = status;
+      const svg = $("coilSvg");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.innerHTML = '<rect width="100" height="100" fill="#0b0f14"/><text x="50" y="48" text-anchor="middle" fill="#ff8b7c" font-size="5">超出可绕制范围</text><text x="50" y="57" text-anchor="middle" fill="#8fa0b3" font-size="2.8">请调整板框、匝数、线宽、间距或焊盘直径</text>';
+    }
+
+    function boardFeatureClearance(d, point, radius) {
+      if (d.shape === "circle") {
+        return d.boardDiameter / 2 - Math.hypot(point[0] - d.cx, point[1] - d.cy) - radius;
+      }
+      return Math.min(point[0], d.W - point[0], point[1], d.H - point[1]) - radius;
+    }
+
+    function minimumBoardClearance(d) {
+      let minimum = Infinity;
+      for (const run of d.runs) {
+        for (const point of run.pts) minimum = Math.min(minimum, boardFeatureClearance(d, point, d.w / 2));
+      }
+      const padPoints = [[d.startX, d.startY], [d.endX, d.endY], ...d.transitionVias];
+      for (const point of padPoints) minimum = Math.min(minimum, boardFeatureClearance(d, point, d.padMm / 2));
+      return minimum;
+    }
+
+    function verifyBoardClearance(d) {
+      d.boardClearanceMeasured = minimumBoardClearance(d);
+      return d.boardClearanceMeasured >= BOARD_EDGE_CLEARANCE - 1e-7;
+    }
+
+    function applyRangeNotice(d) {
+      const messages = [];
+      let level = "warn";
+      if (d.fixedTurnsLimited) {
+        messages.push(`固定匝数请求 ${formatTurns(d.requestedTurns)}，当前最多可绕 ${formatTurns(d.nMax)} 匝，已按 ${formatTurns(d.turns)} 匝绘制。`);
+        level = "error";
+      }
+      if (d.autoLimit === "max") {
+        messages.push(`目标电感超出当前板框的最大绕制能力，已达到 ${formatTurns(d.nMax)} 匝上限。`);
+        level = "error";
+      } else if (d.autoLimit === "min") {
+        messages.push("目标电感低于一匝线圈的可实现范围，已停在最小 1.00 匝。");
+      } else if (d.autoLimit === "geometry") {
+        messages.push(`连续解 ${formatTurns(d.geometryAdjustedFrom)} 匝净距不足，已改用可制造的 ${formatTurns(d.turns)} 匝。`);
+      }
+      if (messages.length) showRangeAlert(messages.join(" "), level);
+      else clearRangeAlert();
+    }
+
+    function calcAndDraw() {
+      clearRangeAlert();
+      const capPf = parseFloat($("capPf").value);
+      const freqMhz = parseFloat($("freqMhz").value);
+      const shape = $("shape").value;
+      const rectW = parseFloat($("outerW").value);
+      const rectH = parseFloat($("outerH").value);
+      const circleDia = parseFloat($("circleDia").value);
+      // 圆形模式的 D 就是板框直径；隐藏的矩形 W/H 不再影响圆形结果。
+      const W = shape === "circle" ? circleDia : rectW;
+      const H = shape === "circle" ? circleDia : rectH;
+      const w = parseFloat($("widthMm").value);
+      const gap = parseFloat($("gapMm").value);
+      const chamfer = parseFloat($("chamferMm").value);
+      const dir = $("dir").value;
+      const maxDensity = $("maxDensity").checked;
+      const startSide = $("startSide").value;
+      const endSide = $("endSide").value;
+      const padMm = parseFloat($("padMm").value);
+      const gridMm = parseFloat($("gridMm").value);
+      const oz = parseFloat($("copperOz").value);
+      const dualLayer = $("dualLayer").checked;
+
+      const minimumBoardSpan = 2 * BOARD_EDGE_INSET + Math.max(w, padMm);
+      if (!(capPf > 0) || !(freqMhz > 0) || !(w > 0) || !(gap > 0) || !(padMm > 0) || !(gridMm > 0) || !(W > minimumBoardSpan) || !(H > minimumBoardSpan)) {
+        failCalculation("参数无效，或板框小到无法满足线/过孔边缘距板框 0.30 mm 的硬约束。", "参数超出范围");
+        return;
+      }
+
+      const pitch = windingPitch(w, gap, false);
+      const bottomInset = BOARD_EDGE_INSET + pitch / 2;
+      const Ltarget = lnHFromLC(capPf, freqMhz);
+      const circleOuterDiameter = shape === 'circle' ? circleDia - 2 * BOARD_EDGE_INSET : null;
+      const bottomCircleDiameter = shape === 'circle' ? Math.max(circleOuterDiameter - pitch, w) : null;
+
+      let nMax = dualLayer
+        ? Math.min(
+            maxTurns({ W, H, w, gap, padMm, dualLayer, outerInset: BOARD_EDGE_INSET, shape, outerDiameter: circleOuterDiameter }),
+            maxTurns({ W, H, w, gap, padMm, dualLayer, outerInset: bottomInset, shape, outerDiameter: bottomCircleDiameter })
+          )
+        : maxTurns({ W, H, w, gap, padMm, dualLayer, outerInset: BOARD_EDGE_INSET, shape, outerDiameter: circleOuterDiameter });
+      if (shape === "rect") {
+        const seed = startPos.userSet ? startPos : defaultOuterBL(w, padMm, gridMm);
+        const topOpeningMax = maxRectTurnsWithOpening({
+          W, H, w, gap, padMm, chamfer, dir,
+          startX: seed.x, startY: seed.y, outerInset: BOARD_EDGE_INSET, limit: nMax,
+        });
+        const bottomOpeningMax = dualLayer ? maxRectTurnsWithOpening({
+          W, H, w, gap, padMm, chamfer, dir: dir === "cw" ? "ccw" : "cw",
+          startX: seed.x, startY: seed.y, outerInset: bottomInset, limit: nMax,
+        }) : nMax;
+        nMax = Math.min(nMax, topOpeningMax, bottomOpeningMax);
+      }
+      if (nMax < 1) {
+        failCalculation(`当前${shape === "circle" ? "圆形" : "矩形"}板框无法同时容纳线圈、端子和 0.30 mm 板边安全距，请增大板框或减小焊盘/线宽/间距。`, "可绕制空间不足");
+        return;
+      }
+      const requestedTurns = parseFloat($("turnsFixed").value);
+      const fixedTurnsLimited = !maxDensity && (!(requestedTurns >= MIN_TURNS) || requestedTurns > nMax + 1e-9);
+      let turns = maxDensity
+        ? autoTurnsForTarget({ W, H, w, gap, nMax, capPf, freqMhz, dualLayer, shape, outerDiameter: circleOuterDiameter })
+        : Math.min(Math.max(requestedTurns || MIN_TURNS, MIN_TURNS), nMax);
+      turns = Number(Math.min(nMax, Math.max(MIN_TURNS, Math.round(turns / TURN_RESOLUTION) * TURN_RESOLUTION)).toFixed(2));
+
+      const { Wc, Hc } = copperOuterSize(W, H, BOARD_EDGE_INSET);
+
+      if (shape === 'circle') {
+        // ---- 圆形螺旋 ----
+        const cx = W / 2, cy = H / 2;
+        const boardDiameter = circleDia;
+        const actualDiameter = circleOuterDiameter;
+        const outerR = actualDiameter / 2;
+        const outerTraceR = outerR - w / 2;
+        const innerR = Math.max(outerR - w - Math.max(turns - 1, 0) * pitch, 0.005);
+
+        if (!startPos.userSet) {
+          startPos.x = cx;
+          startPos.y = cy - outerTraceR;
+        }
+
+        const built = buildCircleSpiral({
+          W, H, w, gap, turns, dir,
+          startX: startPos.x,
+          startY: startPos.y,
+          padMm, gridMm,
+          dualLayer: false,
+          outerDiameter: actualDiameter,
+        });
+
+        let pts;
+        let runs;
+        let transitionVias;
+        let startLayer = 'TopLayer';
+        let endLayer = 'TopLayer';
+        if (dualLayer) {
+          // 顶层内→外、底层外→内；两层圆弧角向相同，在外侧开口过孔串联。
+          const gapAngle = Math.atan2(startPos.y - cy, startPos.x - cx);
+          const tangent = [-Math.sin(gapAngle), Math.cos(gapAngle)];
+          const terminalStep = (padMm + gap) / 2;
+          const terminalRight = [cx + tangent[0] * terminalStep, cy + tangent[1] * terminalStep];
+          const terminalLeft = [cx - tangent[0] * terminalStep, cy - tangent[1] * terminalStep];
+          const topBuilt = buildCircleSpiral({
+            W, H, w, gap, turns, dir: 'ccw',
+            startX: startPos.x, startY: startPos.y,
+            padMm, gridMm, dualLayer: false,
+            outerDiameter: actualDiameter,
+            radialOrder: 'inner-out',
+            terminalStart: terminalRight,
+            terminalEnd: [cx, cy],
+          });
+          const bottomBuilt = buildCircleSpiral({
+            W, H, w, gap, turns, dir: 'ccw',
+            startX: startPos.x, startY: startPos.y,
+            padMm, gridMm, dualLayer: false,
+            outerInset: bottomInset,
+            outerDiameter: Math.max(actualDiameter - pitch, w + gap),
+            radialOrder: 'outer-in',
+            terminalStart: [cx, cy],
+            terminalEnd: terminalLeft,
+          });
+          const topPts = [...topBuilt.pts];
+          const bottomPts = [...bottomBuilt.pts];
+          // 不依赖采样点下标取换层位置：小数匝的最后一段可能不是完整圆，
+          // 但两层仍应使用各自完整外圈在开口处的真实端点。
+          const topOuterEnd = topBuilt.outerArcEnd || topPts.at(-2);
+          const bottomOuterStart = bottomBuilt.outerArcStart || bottomPts[1];
+          let viaPt = [
+            (topOuterEnd[0] + bottomOuterStart[0]) / 2,
+            (topOuterEnd[1] + bottomOuterStart[1]) / 2,
+          ];
+          // 将过孔圆心拉回板内，给焊盘半径和板边间距留足空间。
+          const viaDx = viaPt[0] - cx;
+          const viaDy = viaPt[1] - cy;
+          const viaR = Math.hypot(viaDx, viaDy);
+          const maxViaR = Math.max(boardDiameter / 2 - BOARD_EDGE_INSET - Math.max(padMm, w) / 2, 0.01);
+          if (viaR > maxViaR) {
+            viaPt = [cx + viaDx / viaR * maxViaR, cy + viaDy / viaR * maxViaR];
+          }
+          topPts[topPts.length - 1] = [...viaPt];
+          bottomPts[0] = [...viaPt];
+
+          if (dir === 'cw') {
+            const bottomReverse = [...bottomPts].reverse();
+            const topReverse = [...topPts].reverse();
+            runs = [
+              { layer: 'BottomLayer', pts: bottomReverse },
+              { layer: 'TopLayer', pts: topReverse },
+            ];
+            pts = [...bottomReverse, ...topReverse.slice(1)];
+            startLayer = 'BottomLayer';
+            endLayer = 'TopLayer';
+          } else {
+            runs = [
+              { layer: 'TopLayer', pts: topPts },
+              { layer: 'BottomLayer', pts: bottomPts },
+            ];
+            pts = [...topPts, ...bottomPts.slice(1)];
+            startLayer = 'TopLayer';
+            endLayer = 'BottomLayer';
+          }
+          transitionVias = [viaPt];
+        } else {
+          pts = [...built.pts];
+          runs = [{ layer: 'TopLayer', pts }];
+          transitionVias = [];
+        }
+
+        startPos.x = built.routeStart[0];
+        startPos.y = built.routeStart[1];
+
+        const effectiveTurns = dualLayer ? turns * 2 : turns;
+        const innerREff = dualLayer ? innerR - pitch / 2 : innerR;
+        const Dout = outerR * 2;
+        const Din = Math.max(innerREff * 2, 0.01);
+        const Lgeo = inductanceCircle_nH(effectiveTurns, Dout, Din);
+        const len = pathLength(pts);
+        const Rdc = estimateRdc(len, w, oz);
+        const actualFreqMhz = resonantFrequencyMHz(Lgeo, capPf);
+        const recommendedCapPf = capacitanceForResonancePf(Lgeo, freqMhz);
+        const inductanceDelta = (Lgeo - Ltarget) / Ltarget;
+        const inductanceErr = Math.abs(inductanceDelta);
+        const err = Math.abs(actualFreqMhz - freqMhz) / freqMhz;
+        const autoLimit = maxDensity && Math.abs(turns - nMax) < TURN_RESOLUTION / 2 && Lgeo < Ltarget * (1 - 1e-9)
+          ? 'max'
+          : (maxDensity && Math.abs(turns - MIN_TURNS) < TURN_RESOLUTION / 2 && Lgeo > Ltarget * (1 + 1e-9) ? 'min' : null);
+        const Q = 2 * Math.PI * freqMhz * 1e6 * (Lgeo * 1e-9) / Math.max(Rdc, 1e-9);
+        const margin = Math.max(W, H) * 0.08;
+
+        const circleStartSide = dualLayer ? 'inner' : (dir === 'cw' ? 'outer' : 'inner');
+        const circleEndSide = dualLayer ? 'inner' : (dir === 'cw' ? 'inner' : 'outer');
+        last = {
+          pts, runs, transitionVias, dualLayer, startSide: circleStartSide, endSide: circleEndSide, startLayer, endLayer,
+          effectiveTurns, W, H, w, gap, turns, chamfer, dir,
+          startX: pts[0][0], startY: pts[0][1],
+          endX: pts.at(-1)[0], endY: pts.at(-1)[1],
+          outerX: startPos.x, outerY: startPos.y,
+          routeStartX: built.routeStart[0], routeStartY: built.routeStart[1],
+          padMm, Lgeo, Ltarget, actualFreqMhz, recommendedCapPf, inductanceDelta, inductanceErr, len, Rdc, Q, err, autoLimit, nMax, capPf, freqMhz, pitch, margin,
+          Wc, Hc, boardDiameter, innerW: innerREff * 2, innerH: innerREff * 2, gridMm,
+          shape: 'circle', cx, cy, outerR, outerTraceR, innerR: innerREff,
+          fixedTurnsLimited, requestedTurns
+        };
+        if (!verifyBoardClearance(last)) {
+          failCalculation(`圆形线圈生成后检测到板边净距仅 ${last.boardClearanceMeasured.toFixed(3)} mm，已停止输出；请调整参数。`, "板边净距校验失败");
+          return;
+        }
+        dragPreview = null;
+        drawSvg(last);
+        renderResult(last);
+        setExportEnabled(true);
+        applyRangeNotice(last);
+        $("status").textContent = `${maxDensity ? '自动' : '固定'} N=${formatTurns(turns)}${dualLayer ? `×2=${formatTurns(effectiveTurns)}` : ""}/${nMax} · 板框 ⌀${boardDiameter.toFixed(1)} mm · 铜皮 ⌀${actualDiameter.toFixed(1)} mm · L≈${Lgeo.toFixed(0)} nH${autoLimit === 'max' ? ' · 已达可铺上限' : autoLimit === 'min' ? ' · 已达最小匝数' : ''}`;
+        $("circleDiaHint").textContent = `板框 ⌀${boardDiameter.toFixed(2)} mm，可用铜皮外径 ⌀${actualDiameter.toFixed(2)} mm（四周保留 0.30 mm）`;
+        saveSettings();
+        return;
+      }
+
+      // ---- 矩形螺旋 ----
+      if (!startPos.userSet) {
+        const d0 = defaultOuterBL(w, padMm, gridMm);
+        startPos.x = d0.x;
+        startPos.y = d0.y;
+      }
+
+      const oppositeDir = dir === "cw" ? "ccw" : "cw";
+      const topBuildDir = dualLayer && startSide === "inner" ? oppositeDir : dir;
+      const bottomBuildDir = topBuildDir === "cw" ? "ccw" : "cw";
+      const sharedOuterSeed = dualLayer && startSide === "inner" && layerViaPos.userSet ? layerViaPos : startPos;
+      const buildRectPair = (candidateTurns) => {
+        // 双端内侧的外侧孔是真正的层间公共节点，必须先落在两层开口约束
+        // 的交集内；绝不能让顶/底层各自夹紧后再强行合并端点。
+        const commonOuterVia = dualLayer && startSide === "inner"
+          ? projectRectCommonOpeningVia({
+              W, H, w, gap, turns: candidateTurns, chamfer,
+              topDir: topBuildDir, bottomDir: bottomBuildDir,
+              padMm, gridMm, bottomInset,
+              x: sharedOuterSeed.x, y: sharedOuterSeed.y,
+              lockRequestedSide: layerViaPos.userSet,
+            })
+          : null;
+        if (dualLayer && startSide === "inner" && !commonOuterVia) {
+          const invalid = {
+            invalid: "当前匝数没有可供顶/底层共用的外侧换层位置，请减少匝数或增大板框。",
+            pts: [], runs: [], transitionVias: [], snap: sharedOuterSeed,
+            routeStart: { x: sharedOuterSeed.x, y: sharedOuterSeed.y },
+          };
+          return { built: invalid, bottomBuilt: invalid, commonOuterVia: null };
+        }
+        const pairSeed = commonOuterVia || sharedOuterSeed;
+        const top = buildRectSpiralMaxArea({
+          W, H, w, gap, turns: candidateTurns, chamfer,
+          dir: topBuildDir,
+          startX: pairSeed.x,
+          startY: pairSeed.y,
+          padMm,
+          gridMm,
+          dualLayer: false,
+        });
+        const plannedOuterEnd = dualLayer && startSide === "outer" && !top.invalid
+          ? adjacentOuterPad({ x: top.pts[0][0], y: top.pts[0][1] }, W, H, w, gap, padMm, gridMm)
+          : null;
+        const bottom = dualLayer ? buildRectSpiralMaxArea({
+          W, H, w, gap, outerInset: bottomInset, turns: candidateTurns, chamfer, dir: bottomBuildDir,
+          startX: plannedOuterEnd ? plannedOuterEnd.x : (startSide === "inner" ? top.snap.x : startPos.x),
+          startY: plannedOuterEnd ? plannedOuterEnd.y : (startSide === "inner" ? top.snap.y : startPos.y),
+          padMm,
+          gridMm,
+          dualLayer: false,
+        }) : null;
+        // 理论上两层都应保持 commonOuterVia。留一道数值防线，避免未来修改
+        // 半径公式后又悄悄产生两个不同 snap 并重现交叉。
+        if (commonOuterVia && (!top.invalid && !bottom?.invalid)) {
+          const topDrift = Math.hypot(top.snap.x - commonOuterVia.x, top.snap.y - commonOuterVia.y);
+          const bottomDrift = Math.hypot(bottom.snap.x - commonOuterVia.x, bottom.snap.y - commonOuterVia.y);
+          if (topDrift > 1e-6 || bottomDrift > 1e-6) {
+            const invalid = "顶/底层共同开口位置数值不一致，请移动换层孔或减少匝数。";
+            if (topDrift > 1e-6) top.invalid = invalid;
+            if (bottomDrift > 1e-6) bottom.invalid = invalid;
+          }
+        }
+        return { built: top, bottomBuilt: bottom, commonOuterVia };
+      };
+
+      let { built, bottomBuilt, commonOuterVia } = buildRectPair(turns);
+      let geometryAdjustedFrom = null;
+      if (maxDensity && (built.invalid || bottomBuilt?.invalid)) {
+        // 某些极限内孔能容纳完整匝的开口端，却放不下小数末圈的内侧焊盘。
+        // 按频差排序后逐个验证实际几何，选择全范围内误差最小的可制造解。
+        const frequencyError = (n) => {
+          const hole = innerHoleSize(Wc, Hc, n, w, gap, false);
+          const inductance = inductanceRect_nH(dualLayer ? n * 2 : n, Wc, Hc, hole.innerW, hole.innerH);
+          return Math.abs(resonantFrequencyMHz(inductance, capPf) - freqMhz);
+        };
+        const candidates = [];
+        const firstUnit = Math.ceil(MIN_TURNS / TURN_RESOLUTION - 1e-9);
+        const lastUnit = Math.floor(nMax / TURN_RESOLUTION + 1e-9);
+        for (let unit = firstUnit; unit <= lastUnit; unit++) {
+          const n = Number((unit * TURN_RESOLUTION).toFixed(2));
+          candidates.push({ n, error: frequencyError(n) });
+        }
+        candidates.sort((a, b) => a.error - b.error || a.n - b.n);
+        let chosen = null;
+        for (const candidate of candidates) {
+          if (Math.abs(candidate.n - turns) < TURN_RESOLUTION / 2) continue;
+          const pair = buildRectPair(candidate.n);
+          if (!pair.built.invalid && !pair.bottomBuilt?.invalid) {
+            chosen = { n: candidate.n, pair };
+            break;
+          }
+        }
+        if (chosen) {
+          geometryAdjustedFrom = turns;
+          turns = chosen.n;
+          built = chosen.pair.built;
+          bottomBuilt = chosen.pair.bottomBuilt;
+          commonOuterVia = chosen.pair.commonOuterVia;
+        }
+      }
+      if (built.invalid || bottomBuilt?.invalid) {
+        const message = built.invalid || bottomBuilt.invalid;
+        failCalculation(message, "矩形共同开口不可实现");
+        return;
+      }
+      const { innerW: innerWModel, innerH: innerHModel } = innerHoleSize(Wc, Hc, turns, w, gap, false);
+      const { innerW, innerH } = innerHoleSize(Wc, Hc, Math.ceil(turns - 1e-9), w, gap, false);
+      const topOuterToInner = [...built.pts];
+      let topInnerToOuter = [...built.pts].reverse();
+      if (startSide === "inner") {
+        if (!innerStartPos.userSet) {
+          innerStartPos.x = topInnerToOuter[0][0];
+          innerStartPos.y = topInnerToOuter[0][1];
+        }
+        const innerPad = projectInnerPad(
+          innerStartPos.x, innerStartPos.y, innerW, innerH, W, H, padMm, gridMm
+        );
+        innerStartPos.x = innerPad.x;
+        innerStartPos.y = innerPad.y;
+        topInnerToOuter = trimStartToPad(topInnerToOuter, innerPad);
+      }
+      let pts, runs, transitionVias, startLayer = "TopLayer", endLayer = "TopLayer";
+      if (dualLayer) {
+        endLayer = "BottomLayer";
+        if (startSide === "outer") {
+          const bottomInnerToOuter = [...bottomBuilt.pts].reverse();
+          const defaultVia = {
+            x: (topOuterToInner.at(-1)[0] + bottomInnerToOuter[0][0]) / 2,
+            y: (topOuterToInner.at(-1)[1] + bottomInnerToOuter[0][1]) / 2,
+          };
+          const innerVia = projectInnerTransitionVia(
+            layerViaPos.userSet ? layerViaPos.x : defaultVia.x,
+            layerViaPos.userSet ? layerViaPos.y : defaultVia.y,
+            Math.max(innerW - pitch, 0), Math.max(innerH - pitch, 0), W, H, padMm, gap, gridMm
+          );
+          if (!innerVia) {
+            failCalculation("内孔不足以放置换层过孔，请减少匝数或减小焊盘/间距。", "换层过孔空间不足");
+            return;
+          }
+          const via = [innerVia.x, innerVia.y];
+          const safeInnerW = Math.max(innerW - pitch, 0);
+          const safeInnerH = Math.max(innerH - pitch, 0);
+          const topLead = routeInsideInnerHole(topOuterToInner.at(-1), via, safeInnerW, safeInnerH, W, H);
+          const bottomLead = routeInsideInnerHole(bottomInnerToOuter[0], via, safeInnerW, safeInnerH, W, H);
+          const topRun = [...topOuterToInner, ...topLead.slice(1)];
+          const bottomRun = [...bottomLead].reverse().concat(bottomInnerToOuter.slice(1));
+          pts = [...topRun, ...bottomRun.slice(1)];
+          runs = [
+            { layer: "TopLayer", pts: topRun },
+            { layer: "BottomLayer", pts: bottomRun },
+          ];
+          transitionVias = [via];
+          layerViaPos = { x: innerVia.x, y: innerVia.y, userSet: layerViaPos.userSet };
+        } else {
+          const bottomOuterToInner = [...bottomBuilt.pts];
+          const outerVia = commonOuterVia || projectViaCenter(
+              (topInnerToOuter.at(-1)[0] + bottomOuterToInner[0][0]) / 2,
+              (topInnerToOuter.at(-1)[1] + bottomOuterToInner[0][1]) / 2,
+              W, H, w, padMm, gridMm
+            );
+          const via = [outerVia.x, outerVia.y];
+          const adjacent = adjacentInnerPad(
+            { x: topInnerToOuter[0][0], y: topInnerToOuter[0][1] },
+            innerW, innerH, W, H, padMm, gap, gridMm
+          );
+          const topRun = [...topInnerToOuter];
+          topRun[topRun.length - 1] = via;
+          const bottomFromVia = [...bottomOuterToInner];
+          bottomFromVia[0] = via;
+          const bottomRun = trimEndToPad(bottomFromVia, adjacent);
+          pts = [...topRun, ...bottomRun.slice(1)];
+          runs = [
+            { layer: "TopLayer", pts: topRun },
+            { layer: "BottomLayer", pts: bottomRun },
+          ];
+          transitionVias = [via];
+          layerViaPos = { x: outerVia.x, y: outerVia.y, userSet: layerViaPos.userSet };
+        }
+      } else {
+        const reversePath = startSide === "inner";
+        pts = reversePath ? topInnerToOuter : topOuterToInner;
+        runs = [{ layer: "TopLayer", pts }];
+        transitionVias = [];
+      }
+      startPos.x = built.snap.x;
+      startPos.y = built.snap.y;
+
+      const effectiveTurns = dualLayer ? turns * 2 : turns;
+      const Lgeo = inductanceRect_nH(effectiveTurns, Wc, Hc, innerWModel, innerHModel);
+      const len = pathLength(pts);
+      const Rdc = estimateRdc(len, w, oz);
+      const actualFreqMhz = resonantFrequencyMHz(Lgeo, capPf);
+      const recommendedCapPf = capacitanceForResonancePf(Lgeo, freqMhz);
+      const inductanceDelta = (Lgeo - Ltarget) / Ltarget;
+      const inductanceErr = Math.abs(inductanceDelta);
+      const err = Math.abs(actualFreqMhz - freqMhz) / freqMhz;
+      const autoLimit = geometryAdjustedFrom !== null
+        ? 'geometry'
+        : (maxDensity && Math.abs(turns - nMax) < TURN_RESOLUTION / 2 && Lgeo < Ltarget * (1 - 1e-9)
+          ? 'max'
+          : (maxDensity && Math.abs(turns - MIN_TURNS) < TURN_RESOLUTION / 2 && Lgeo > Ltarget * (1 + 1e-9) ? 'min' : null));
+      const Q = 2 * Math.PI * freqMhz * 1e6 * (Lgeo * 1e-9) / Math.max(Rdc, 1e-9);
+      const margin = Math.max(W, H) * 0.08;
+
+      last = {
+        pts, runs, transitionVias, dualLayer, startSide, endSide, startLayer, endLayer, effectiveTurns, W, H, w, gap, turns, chamfer, dir,
+        startX: pts[0][0], startY: pts[0][1],
+        endX: pts.at(-1)[0], endY: pts.at(-1)[1],
+        outerX: startPos.x, outerY: startPos.y,
+        routeStartX: built.routeStart.x, routeStartY: built.routeStart.y,
+        padMm, Lgeo, Ltarget, actualFreqMhz, recommendedCapPf, inductanceDelta, inductanceErr, len, Rdc, Q, err, autoLimit, nMax, capPf, freqMhz, pitch, margin,
+        Wc, Hc, innerW, innerH, gridMm, shape: 'rect', geometryAdjustedFrom,
+        viaAdjustedDistance: commonOuterVia?.distance || 0,
+        fixedTurnsLimited, requestedTurns
+      };
+      if (!verifyBoardClearance(last)) {
+        failCalculation(`矩形线圈生成后检测到板边净距仅 ${last.boardClearanceMeasured.toFixed(3)} mm，已停止输出；请调整参数。`, "板边净距校验失败");
+        return;
+      }
+      dragPreview = null;
+      drawSvg(last);
+      renderResult(last);
+      setExportEnabled(true);
+      applyRangeNotice(last);
+      $("status").textContent = `${maxDensity ? '自动' : '固定'} N=${formatTurns(turns)}${dualLayer ? `×2=${formatTurns(effectiveTurns)}` : ""}/${nMax} · ${W}×${H} mm · L≈${Lgeo.toFixed(0)} nH${autoLimit === 'geometry' ? ' · 已按端子净距取可布最优值' : ''}${commonOuterVia?.distance > 1e-6 ? ' · 换层孔已吸附到共同可行位置' : ''}`;
+      saveSettings();
+    }
+
+    function renderResult(d) {
+      const cls = d.err < 0.08 ? "ok" : d.err < 0.2 ? "warn" : "bad";
+      const inductanceDelta = Number.isFinite(d.inductanceDelta)
+        ? d.inductanceDelta
+        : (d.Lgeo - d.Ltarget) / d.Ltarget;
+      const inductanceDeltaText = `${inductanceDelta >= 0 ? '+' : ''}${(inductanceDelta * 100).toFixed(1)}%`;
+      const shapeInfo = d.shape === 'circle'
+        ? `铜皮外径约 ${(d.outerR * 2).toFixed(2)} mm　模型等效内径约 ${(d.innerR * 2).toFixed(2)} mm`
+        : `铜皮外边缘约 ${d.Wc.toFixed(2)}×${d.Hc.toFixed(2)} mm　内孔约 ${d.innerW.toFixed(2)}×${d.innerH.toFixed(2)} mm`;
+      const dualInfo = d.shape === 'circle'
+        ? (d.dualLayer ? "双层外侧过孔串联（两个自由端在圆心）" : "单层顶层（内端在圆心，外端在线圈外侧）")
+        : (d.dualLayer ? `双层交错串联（底面观察同向；红=顶层，蓝=底层）${d.startSide === "outer" ? "　内侧" : "　外侧"}过孔换层` : `单层顶层　${d.startSide === "outer" ? "外进内出" : "内进外出"}`);
+      const startPlace = d.shape === 'circle' ? (d.startSide === 'outer' ? '外侧' : '圆心') : (d.startSide === 'outer' ? '外侧' : '内侧');
+      const endPlace = d.shape === 'circle' ? (d.endSide === 'outer' ? '外侧' : '圆心') : (d.endSide === 'outer' ? '外侧' : '内侧');
+      $("result").innerHTML = [
+        `目标 L（总等效 C=${d.capPf} pF @ ${d.freqMhz} MHz）：<b>${d.Ltarget.toFixed(1)} nH</b>`,
+        `几何估算 L：${d.Lgeo.toFixed(1)} nH（相对目标 ${inductanceDeltaText}；正值偏大，负值偏小）`,
+        `反算谐振频率：<span class="${cls}">${d.actualFreqMhz.toFixed(3)} MHz</span>（频率偏差 ${(d.err * 100).toFixed(1)}%）`,
+        `当前线圈匹配 ${d.freqMhz} MHz 的推荐总等效 C：<b>${d.recommendedCapPf.toFixed(1)} pF</b>`,
+        `每层匝数：${formatTurns(d.turns)}（最大可铺 ${d.nMax}）${d.dualLayer ? `　串联有效匝数 ${formatTurns(d.effectiveTurns)}` : ""}　线宽 ${d.w} mm　最小间距 ${d.gap} mm`,
+        d.fixedTurnsLimited ? `<span class="bad">请求 ${formatTurns(d.requestedTurns)} 匝超出可绕制范围，已限为 ${formatTurns(d.turns)} 匝。</span>` :
+        d.autoLimit === 'max' ? '<span class="bad">目标电感超过当前板框可实现范围，匝数已卡在最大值；继续调整 C/f 时几何可能保持不变。</span>' :
+          (d.autoLimit === 'min' ? '<span class="warn">目标电感低于一匝线圈，匝数已卡在最小值 1.00。</span>' :
+            (d.autoLimit === 'geometry'
+              ? `<span class="warn">连续解 ${formatTurns(d.geometryAdjustedFrom)} 匝在当前端子/换层孔位置净距不足，已自动采用全范围内频差最小的可布值 ${formatTurns(d.turns)} 匝。</span>`
+              : '<span class="muted">匝数按 0.01 匝连续匹配；非整数部分会作为最内侧一匝的实际局部走线绘制和导出。</span>')),
+        d.viaAdjustedDistance > 1e-6
+          ? `<span class="warn">请求的换层孔位置没有顶/底层共同开口，已沿同一条边吸附到最近可行点（移动 ${d.viaAdjustedDistance.toFixed(3)} mm），避免圆弧被斜线强拉后穿线。</span>`
+          : '',
+        `绘制方式：<b>${dualInfo}</b>`,
+        `${d.shape === 'circle' ? `圆形板框 ⌀${d.boardDiameter.toFixed(2)} mm` : `矩形板框 ${d.W}×${d.H} mm`}　${shapeInfo}`,
+        `<span class="ok">板边最小实测净距 ${d.boardClearanceMeasured.toFixed(3)} mm（要求 ≥ 0.300 mm）</span>`,
+        `线长≈${d.len.toFixed(1)} mm　Rdc≈${d.Rdc.toFixed(3)} Ω　Q≈${d.Q.toFixed(1)}`,
+        `起始端（${d.startLayer} / ${startPlace}）：<b>(${d.startX.toFixed(3)}, ${d.startY.toFixed(3)})</b> mm`,
+        `结束端（${d.endLayer} / ${endPlace}）：<b>(${d.endX.toFixed(3)}, ${d.endY.toFixed(3)})</b> mm`,
+      ].filter(Boolean).join("<br>");
+    }
+
+    function drawSvg(d) {
+      const svg = $("coilSvg");
+      const m = d.margin;
+      const vbW = d.W + 2 * m;
+      const vbH = d.H + 2 * m;
+      const sx = (x) => x + m;
+      const sy = (y) => (d.H - y) + m;
+      const isCircle = d.shape === 'circle';
+
+      const layerPaths = d.runs.map((run) => {
+        const pathD = run.pts.map((p, i) => `${i ? "L" : "M"}${sx(p[0]).toFixed(3)} ${sy(p[1]).toFixed(3)}`).join(" ");
+        const color = run.layer === "TopLayer" ? "#e24c4a" : "#3185fc";
+        return `<path data-layer="${run.layer === 'TopLayer' ? '顶层' : '底层'}" d="${pathD}" fill="none" stroke="${color}" stroke-width="${d.w}"
+              stroke-linecap="butt" stroke-linejoin="miter" opacity="${dragging ? 0.45 : 1}"/>`;
+      }).join("");
+      const transitionVias = d.transitionVias.map((p, index) => {
+        const preview = dragging && dragTarget === "layerVia" && index === 0 && dragPreview
+          ? [dragPreview.x, dragPreview.y] : p;
+        const draggable = d.shape === "rect" && d.dualLayer && index === 0;
+        return draggable
+          ? `<g class="drag-handle" data-drag-kind="layerVia" data-index="${index}">
+               <circle data-preview-only="true" cx="${sx(preview[0])}" cy="${sy(preview[1])}" r="${Math.max(d.padMm / 2, d.w * 1.5)}" fill="transparent"/>
+               <circle data-role="layer-via" data-layer="多层" cx="${sx(preview[0])}" cy="${sy(preview[1])}" r="${d.padMm / 2}" fill="#b66cff" stroke="#ead8ff" stroke-width="${Math.max(d.padMm * 0.08, 0.04)}"/>
+             </g>`
+          : `<circle data-role="layer-via" data-layer="多层" cx="${sx(p[0])}" cy="${sy(p[1])}" r="${d.padMm / 2}" fill="#b66cff"/>`;
+      }).join("");
+      const pStart = d.pts[0];
+      const pEnd = d.pts[d.pts.length - 1];
+      const terminalPreview = dragging && dragTarget === "terminal" ? dragPreview : null;
+      const hx = terminalPreview ? terminalPreview.x : (isCircle ? d.outerX : (d.startSide === "inner" ? d.startX : d.outerX));
+      const hy = terminalPreview ? terminalPreview.y : (isCircle ? d.outerY : (d.startSide === "inner" ? d.startY : d.outerY));
+      const handleR = d.padMm / 2;
+      const hitR = Math.max(handleR, d.w * 1.2);
+
+      // Circle outline for circle shape
+      const circleOutline = isCircle
+        ? `<circle data-preview-only="true" cx="${sx(d.cx)}" cy="${sy(d.cy)}" r="${d.outerR}" fill="none" stroke="#5a8a6a" stroke-width="${Math.max(d.w * 0.08, 0.04)}" stroke-dasharray="3 3"/>`
+        : '';
+
+      const labelText = isCircle
+        ? `${d.dualLayer ? "双层" : "单层"}圆形  ⌀${(d.outerR * 2).toFixed(1)}mm  N=${formatTurns(d.turns)}${d.dualLayer ? "×2" : ""}  L≈${d.Lgeo.toFixed(0)}nH`
+        : (d.dualLayer ? (d.startSide === "outer" ? "双端外侧" : "双端内侧") : (d.startSide === "outer" ? "外进内出" : "内进外出")) + `  ${d.W}×${d.H}mm  N=${formatTurns(d.turns)}${d.dualLayer ? "×2" : ""}  L≈${d.Lgeo.toFixed(0)}nH`;
+
+      svg.setAttribute("viewBox", `0 0 ${vbW} ${vbH}`);
+      svg.style.aspectRatio = `${vbW} / ${vbH}`;
+      const stageEl = svg.closest(".stage");
+      if (stageEl) stageEl.style.aspectRatio = `${vbW} / ${vbH}`;
+      baseViewBox = { x: 0, y: 0, w: vbW, h: vbH };
+      cameraViewBox = { ...baseViewBox };
+      applyView();
+      svg.innerHTML = `
+        <defs data-preview-only="true">
+          <pattern id="mmGrid" x="${sx(0)}" y="${sy(d.H)}" width="1" height="1" patternUnits="userSpaceOnUse">
+            <path d="M 1 0 L 0 0 0 1" fill="none" stroke="#23303d" stroke-width="0.025"/>
+          </pattern>
+        </defs>
+        <rect data-preview-only="true" x="0" y="0" width="${vbW}" height="${vbH}" fill="#0b0f14"/>
+        <rect data-preview-only="true" x="${sx(0)}" y="${sy(d.H)}" width="${d.W}" height="${d.H}" fill="url(#mmGrid)"/>
+        ${isCircle
+          ? `<circle data-layer="板框层" cx="${sx(d.cx)}" cy="${sy(d.cy)}" r="${(d.boardDiameter / 2).toFixed(4)}" fill="none" stroke="#7b5ea7" stroke-width="${Math.max(d.w * 0.12, 0.04)}"/>`
+          : `<rect data-layer="板框层" x="${sx(0)}" y="${sy(d.H)}" width="${d.W}" height="${d.H}" fill="none" stroke="#7b5ea7" stroke-width="${Math.max(d.w * 0.12, 0.04)}"/>`}
+        ${circleOutline}
+        ${layerPaths}
+        ${transitionVias}
+        <circle data-layer="${d.startLayer === 'TopLayer' ? '顶层' : '底层'}" cx="${sx(pStart[0])}" cy="${sy(pStart[1])}" r="${d.padMm / 2}" fill="#f0a202"/>
+        <circle data-layer="${d.endLayer === 'TopLayer' ? '顶层' : '底层'}" cx="${sx(pEnd[0])}" cy="${sy(pEnd[1])}" r="${d.padMm / 2}" fill="#2bb0a6"/>
+        <g id="startHandle" class="drag-handle" data-drag-kind="terminal">
+          <circle cx="${sx(hx)}" cy="${sy(hy)}" r="${hitR}" fill="transparent"/>
+          <circle cx="${sx(hx)}" cy="${sy(hy)}" r="${handleR}" fill="#f0a202" stroke="#ffe6a8" stroke-width="${Math.max(handleR * 0.16, 0.04)}"/>
+          <circle cx="${sx(hx)}" cy="${sy(hy)}" r="${handleR * 0.28}" fill="#1a1400"/>
+        </g>
+        <text x="${sx(0.3)}" y="${sy(-m * 0.35)}" fill="#8fa0b3"
+              font-size="${Math.max(Math.min(d.W, d.H) * 0.045, 0.7)}" font-family="Consolas, monospace">
+          ${labelText}
+        </text>
+      `;
+    }
+
+    function clientToMm(clientX, clientY) {
+      const svg = $("coilSvg");
+      const pt = svg.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const ctm = svg.getScreenCTM();
+      if (!ctm || !last) return null;
+      const sp = pt.matrixTransform(ctm.inverse());
+      const m = last.margin;
+      const raw = {
+        x: Math.min(Math.max(sp.x - m, 0), last.W),
+        y: Math.min(Math.max(last.H - (sp.y - m), 0), last.H),
+      };
+      if (dragTarget === "layerVia" && last.shape === "rect" && last.dualLayer) {
+        if (last.startSide === "outer") {
+          return projectInnerTransitionVia(
+            raw.x, raw.y,
+            Math.max(last.innerW - last.pitch, 0), Math.max(last.innerH - last.pitch, 0),
+            last.W, last.H, last.padMm, last.gap, last.gridMm
+          );
+        }
+        return projectViaCenter(raw.x, raw.y, last.W, last.H, last.w, last.padMm, last.gridMm);
+      }
+      if (last.shape === 'circle') {
+        return projectOuterCircle(raw.x, raw.y, last.cx, last.cy, last.outerTraceR, last.padMm, last.gridMm);
+      }
+      if (last.startSide === "inner") {
+        return projectInnerPad(raw.x, raw.y, last.innerW, last.innerH, last.W, last.H, last.padMm, last.gridMm);
+      }
+      return projectViaCenter(raw.x, raw.y, last.W, last.H, last.w, last.padMm, last.gridMm);
+    }
+
+    function projectOuterCircle(x, y, cx, cy, r, padMm, gridMm) {
+      const angle = Math.atan2(y - cy, x - cx);
+      let sx = cx + r * Math.cos(angle);
+      let sy = cy + r * Math.sin(angle);
+      if (gridMm > 0) {
+        sx = Math.round(sx / gridMm) * gridMm;
+        sy = Math.round(sy / gridMm) * gridMm;
+      }
+      return { x: sx, y: sy };
+    }
+
+    function moveHandleOnly(x, y) {
+      if (!last) return;
+      dragPreview = { x, y };
+      const svg = $("coilSvg");
+      const m = last.margin;
+      const sx = x + m;
+      const sy = (last.H - y) + m;
+      const g = dragTarget === "layerVia"
+        ? svg.querySelector('[data-drag-kind="layerVia"][data-index="0"]')
+        : svg.querySelector("#startHandle");
+      if (!g) return;
+      g.querySelectorAll("circle").forEach((c, i) => {
+        c.setAttribute("cx", sx);
+        c.setAttribute("cy", sy);
+      });
+      const label = dragTarget === "layerVia" ? "换层过孔" : (last.startSide === "inner" ? "内侧起始焊盘" : "外侧端点");
+      $("scaleInfo").textContent = `拖动${label} (${x.toFixed(3)}, ${y.toFixed(3)}) · 松手后重算`;
+    }
+
+    function updateZoomInfo() {
+      if (!baseViewBox || !cameraViewBox) {
+        $("zoomInfo").textContent = "缩放 100%";
+        return;
+      }
+      const baseAvg = (baseViewBox.w + baseViewBox.h) / 2;
+      const camAvg = (cameraViewBox.w + cameraViewBox.h) / 2;
+      const pct = baseAvg > 0 ? (baseAvg / camAvg) * 100 : 100;
+      $("zoomInfo").textContent = `缩放 ${pct.toFixed(0)}%`;
+    }
+
+    function setCameraViewBox(vb) {
+      cameraViewBox = { ...vb };
+      $("coilSvg").setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+      updateZoomInfo();
+    }
+
+    function fitToView() {
+      if (!baseViewBox) return;
+      setCameraViewBox({ x: baseViewBox.x, y: baseViewBox.y, w: baseViewBox.w, h: baseViewBox.h });
+    }
+
+    function zoomAt(clientX, clientY, factor) {
+      if (!cameraViewBox || !baseViewBox) return;
+      const svg = $("coilSvg");
+      const rect = svg.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const px = (clientX - rect.left) / rect.width;
+      const py = (clientY - rect.top) / rect.height;
+      const cam = cameraViewBox;
+      const cx = cam.x + px * cam.w;
+      const cy = cam.y + py * cam.h;
+      const minW = baseViewBox.w / 20;
+      const maxW = baseViewBox.w * 4;
+      let newW = cam.w * factor;
+      newW = Math.min(Math.max(newW, minW), maxW);
+      const newH = cam.h * (newW / cam.w);
+      const newX = cx - px * newW;
+      const newY = cy - py * newH;
+      setCameraViewBox({ x: newX, y: newY, w: newW, h: newH });
+    }
+
+    function applyView() {
+      const svg = $("coilSvg");
+      if (!svg || !cameraViewBox) return;
+      svg.setAttribute("viewBox", `${cameraViewBox.x} ${cameraViewBox.y} ${cameraViewBox.w} ${cameraViewBox.h}`);
+      const wanted = activeLayerView;
+      svg.querySelectorAll("[data-layer]").forEach((el) => {
+        const layer = el.getAttribute("data-layer");
+        let visible = true;
+        if (wanted === "top") visible = layer === "顶层";
+        else if (wanted === "bottom") visible = layer === "底层";
+        if (visible) el.removeAttribute("display");
+        else el.setAttribute("display", "none");
+      });
+      updateZoomInfo();
+    }
+
+    function onWheel(e) {
+      if (!last) return;
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
+      zoomAt(e.clientX, e.clientY, factor);
+    }
+
+    function startPan(e) {
+      if (!cameraViewBox || !last) return;
+      e.preventDefault();
+      panning = true;
+      panStartClient = { x: e.clientX, y: e.clientY };
+      panStartViewBox = { ...cameraViewBox };
+      $("coilSvg").classList.add("panning");
+      $("coilSvg").setPointerCapture?.(e.pointerId);
+    }
+
+    function panBy(dxPx, dyPx) {
+      if (!panning || !panStartClient || !panStartViewBox) return;
+      const svg = $("coilSvg");
+      const rect = svg.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const vb = panStartViewBox;
+      let nx = vb.x - (dxPx / rect.width) * vb.w;
+      let ny = vb.y - (dyPx / rect.height) * vb.h;
+      // 限制平移范围：相机窗口中心不超出基础视图太多，避免拖丢
+      const pad = 0.5;
+      const cx0 = baseViewBox.x + baseViewBox.w / 2;
+      const cy0 = baseViewBox.y + baseViewBox.h / 2;
+      const limitX = baseViewBox.w * (0.5 + pad);
+      const limitY = baseViewBox.h * (0.5 + pad);
+      const cx = nx + vb.w / 2;
+      const cy = ny + vb.h / 2;
+      if (Math.abs(cx - cx0) > limitX) nx = cx0 + Math.sign(cx - cx0) * limitX - vb.w / 2;
+      if (Math.abs(cy - cy0) > limitY) ny = cy0 + Math.sign(cy - cy0) * limitY - vb.h / 2;
+      setCameraViewBox({ x: nx, y: ny, w: vb.w, h: vb.h });
+    }
+
+    function endPan(e) {
+      if (!panning) return;
+      panning = false;
+      panStartClient = null;
+      panStartViewBox = null;
+      $("coilSvg").classList.remove("panning");
+      try { $("coilSvg").releasePointerCapture?.(e.pointerId); } catch (_) {}
+    }
+
+    function onPointerDown(e) {
+      if (!last) return;
+      if (e.button === 1) { // 鼠标中键 → 平移
+        startPan(e);
+        return;
+      }
+      if (!e.target.closest) return;
+      const handle = e.target.closest("[data-drag-kind]");
+      if (!handle) return;
+      e.preventDefault();
+      dragTarget = handle.dataset.dragKind === "layerVia" ? "layerVia" : "terminal";
+      dragging = true;
+      $("coilSvg").classList.add("dragging");
+      $("coilSvg").setPointerCapture?.(e.pointerId);
+      // 拖动中让线圈半透明，提示尚未重算
+      $("coilSvg").querySelectorAll("path[data-layer]").forEach(path => path.setAttribute("opacity", "0.45"));
+      const mm = clientToMm(e.clientX, e.clientY);
+      if (mm) moveHandleOnly(mm.x, mm.y);
+    }
+
+    function onPointerMove(e) {
+      if (panning) {
+        e.preventDefault();
+        panBy(e.clientX - panStartClient.x, e.clientY - panStartClient.y);
+        return;
+      }
+      if (!dragging || !last) return;
+      e.preventDefault();
+      const mm = clientToMm(e.clientX, e.clientY);
+      if (mm) moveHandleOnly(mm.x, mm.y);
+    }
+
+    function onPointerUp(e) {
+      if (panning) {
+        endPan(e);
+        return;
+      }
+      if (!dragging) return;
+      dragging = false;
+      $("coilSvg").classList.remove("dragging");
+      try { $("coilSvg").releasePointerCapture?.(e.pointerId); } catch (_) {}
+
+      const mm = clientToMm(e.clientX, e.clientY) || dragPreview;
+      if (mm && last) {
+        if (dragTarget === "layerVia") {
+          layerViaPos = { x: mm.x, y: mm.y, userSet: true };
+        } else if (last.shape === 'circle') {
+          const snap = projectOuterCircle(mm.x, mm.y, last.cx, last.cy, last.outerR, last.padMm, last.gridMm);
+          startPos.x = snap.x;
+          startPos.y = snap.y;
+          startPos.userSet = true;
+        } else if (last.startSide === "inner") {
+          const snap = projectInnerPad(mm.x, mm.y, last.innerW, last.innerH, last.W, last.H, last.padMm, last.gridMm);
+          innerStartPos.x = snap.x;
+          innerStartPos.y = snap.y;
+          innerStartPos.userSet = true;
+        } else {
+          const snap = projectViaCenter(mm.x, mm.y, last.W, last.H, last.w, last.padMm, last.gridMm);
+          startPos.x = snap.x;
+          startPos.y = snap.y;
+          startPos.userSet = true;
+        }
+      }
+      dragPreview = null;
+      dragTarget = null;
+      calcAndDraw(); // 松手后重新计算
+    }
+
+    function download(name, text, mime) {
+      const blob = new Blob([text], { type: mime || "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function exportSvg() {
+      if (!last) calcAndDraw();
+      const clone = $("coilSvg").cloneNode(true);
+      clone.querySelectorAll('[data-preview-only="true"]').forEach(el => el.remove());
+      clone.querySelector("#startHandle")?.remove();
+      clone.querySelectorAll("text").forEach(el => el.remove());
+      download(`coil_${last.W}x${last.H}_N${formatTurns(last.turns)}.svg`, `<?xml version="1.0" encoding="UTF-8"?>\n${clone.outerHTML}`, "image/svg+xml");
+    }
+
+    function exportDxf() {
+      if (!last) calcAndDraw();
+      const exportLayer = (layer) => layer === "TopLayer" ? "顶层" : layer === "BottomLayer" ? "底层" : "多层";
+      const lines = [
+        "0", "SECTION", "2", "HEADER",
+        "9", "$ACADVER", "1", "AC1015",
+        "9", "$INSUNITS", "70", "4",
+        "9", "$MEASUREMENT", "70", "1",
+        "0", "ENDSEC",
+        "0", "SECTION", "2", "ENTITIES",
+      ];
+      if (last.shape === "circle") {
+        lines.push(
+          "0", "CIRCLE", "100", "AcDbEntity", "8", "板框层", "100", "AcDbCircle",
+          "10", last.cx.toFixed(4), "20", last.cy.toFixed(4), "30", "0",
+          "40", (last.boardDiameter / 2).toFixed(4)
+        );
+      } else {
+        lines.push(
+          "0", "LWPOLYLINE", "100", "AcDbEntity", "8", "板框层",
+          "100", "AcDbPolyline", "90", "4", "70", "1",
+          "10", "0", "20", "0",
+          "10", last.W.toFixed(4), "20", "0",
+          "10", last.W.toFixed(4), "20", last.H.toFixed(4),
+          "10", "0", "20", last.H.toFixed(4)
+        );
+      }
+      for (const run of last.runs) {
+        lines.push(
+          "0", "LWPOLYLINE", "100", "AcDbEntity", "8", exportLayer(run.layer),
+          "100", "AcDbPolyline", "90", String(run.pts.length), "70", "0", "43", last.w.toFixed(4)
+        );
+        for (const p of run.pts) lines.push("10", p[0].toFixed(4), "20", p[1].toFixed(4));
+      }
+      lines.push(
+        "0", "CIRCLE", "100", "AcDbEntity", "8", exportLayer(last.startLayer), "100", "AcDbCircle",
+        "10", last.startX.toFixed(4), "20", last.startY.toFixed(4), "30", "0",
+        "40", (last.padMm / 2).toFixed(4),
+        "0", "CIRCLE", "100", "AcDbEntity", "8", exportLayer(last.endLayer), "100", "AcDbCircle",
+        "10", last.pts[last.pts.length - 1][0].toFixed(4), "20", last.pts[last.pts.length - 1][1].toFixed(4), "30", "0",
+        "40", (last.padMm / 2).toFixed(4)
+      );
+      for (const p of last.transitionVias) {
+        lines.push(
+          "0", "CIRCLE", "100", "AcDbEntity", "8", "多层", "100", "AcDbCircle",
+          "10", p[0].toFixed(4), "20", p[1].toFixed(4), "30", "0",
+          "40", (last.padMm / 2).toFixed(4)
+        );
+      }
+      lines.push("0", "ENDSEC", "0", "EOF");
+      download(`coil_${last.W}x${last.H}_N${formatTurns(last.turns)}.dxf`, lines.join("\n"), "application/dxf");
+    }
+
+    function exportEasyeda() {
+      if (!last) calcAndDraw();
+      const exportLayer = (layer) => layer === "TopLayer" ? "顶层" : layer === "BottomLayer" ? "底层" : "多层";
+      const shapeName = last.shape === 'circle' ? 'CircleSpiral' : 'RectSpiral';
+      const payload = {
+        name: `${shapeName}_${last.W}x${last.H}_N${formatTurns(last.turns)}`,
+        unit: "mm",
+        origin: "outer_bottom_left",
+        allowed_layers: ["板框层", "顶层", "底层", "多层"],
+        layers: last.dualLayer ? ["顶层", "底层"] : ["顶层"],
+        mode: last.dualLayer ? "dual_layer_series_same_winding" : "single_layer",
+        width: last.w,
+        min_clearance: last.gap,
+        start_grid: last.gridMm,
+        turns: last.turns,
+        board: last.shape === "circle"
+          ? { layer: "板框层", shape: "circle", cx: last.cx, cy: last.cy, diameter: last.boardDiameter }
+          : { layer: "板框层", w: last.W, h: last.H },
+        copper_outer: { w: last.Wc, h: last.Hc },
+        terminal_layout: `${last.startSide}_to_${last.endSide}`,
+        start_terminal: { layer: exportLayer(last.startLayer), side: last.startSide, x: last.startX, y: last.startY, diameter: last.padMm },
+        end_terminal: { layer: exportLayer(last.endLayer), side: last.endSide, x: last.endX, y: last.endY, diameter: last.padMm },
+        outer_terminal: { x: last.outerX, y: last.outerY, diameter: last.padMm },
+        route_start: { x: last.routeStartX, y: last.routeStartY },
+        format_note: "centerline points with width; use DXF/SVG for direct graphic import",
+        inductance_nH_est: Number(last.Lgeo.toFixed(2)),
+        target_nH: Number(last.Ltarget.toFixed(2)),
+        layer_runs: last.runs.map(run => ({
+          layer: exportLayer(run.layer),
+          points: run.pts.map(p => [Number(p[0].toFixed(4)), Number(p[1].toFixed(4))]),
+        })),
+        transition_vias: last.transitionVias.map(p => ({
+          layer: "多层", x: Number(p[0].toFixed(4)), y: Number(p[1].toFixed(4)), diameter: last.padMm,
+        })),
+        points: last.pts.map(p => [Number(p[0].toFixed(4)), Number(p[1].toFixed(4))]),
+      };
+      download(`coil_easyeda_${last.W}x${last.H}.json`, JSON.stringify(payload, null, 2), "application/json");
+    }
+
+    function saveSettings() {
+      try {
+        const fields = {};
+        for (const id of SETTING_FIELDS) {
+          const el = $(id);
+          fields[id] = el.type === "checkbox" ? el.checked : el.value;
+        }
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+          fields,
+          startPos,
+          innerStartPos,
+          layerViaPos,
+        }));
+      } catch (_) {}
+    }
+
+    function loadSettings() {
+      try {
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        for (const id of SETTING_FIELDS) {
+          if (!saved.fields || !(id in saved.fields)) continue;
+          const el = $(id);
+          if (el.type === "checkbox") el.checked = !!saved.fields[id];
+          else el.value = saved.fields[id];
+        }
+        if (saved.startPos && Number.isFinite(saved.startPos.x) && Number.isFinite(saved.startPos.y)) {
+          startPos = {
+            x: saved.startPos.x,
+            y: saved.startPos.y,
+            userSet: !!saved.startPos.userSet,
+          };
+        }
+        if (saved.innerStartPos && Number.isFinite(saved.innerStartPos.x) && Number.isFinite(saved.innerStartPos.y)) {
+          innerStartPos = {
+            x: saved.innerStartPos.x,
+            y: saved.innerStartPos.y,
+            userSet: !!saved.innerStartPos.userSet,
+          };
+        }
+        if (saved.layerViaPos && Number.isFinite(saved.layerViaPos.x) && Number.isFinite(saved.layerViaPos.y)) {
+          layerViaPos = {
+            x: saved.layerViaPos.x,
+            y: saved.layerViaPos.y,
+            userSet: !!saved.layerViaPos.userSet,
+          };
+        }
+      } catch (_) {}
+    }
+
+    loadSettings();
+    function syncShapeControls() {
+      const circle = $("shape").value === "circle";
+      $("rectBoardRow").style.display = circle ? "none" : "grid";
+      $("circleDiaRow").style.display = circle ? "grid" : "none";
+      $("chamferMm").disabled = circle;
+      $("startSide").disabled = circle;
+      $("endSide").disabled = circle;
+    }
+    syncShapeControls();
+    function syncTerminalSides(changed) {
+      const sameSide = $("dualLayer").checked;
+      if (changed === "endSide") {
+        $("startSide").value = sameSide
+          ? $("endSide").value
+          : ($("endSide").value === "outer" ? "inner" : "outer");
+      } else {
+        $("endSide").value = sameSide
+          ? $("startSide").value
+          : ($("startSide").value === "outer" ? "inner" : "outer");
+      }
+    }
+    syncTerminalSides("startSide");
+    $("turnsRow").style.display = $("maxDensity").checked ? "none" : "grid";
+
+    $("maxDensity").addEventListener("change", () => {
+      $("turnsRow").style.display = $("maxDensity").checked ? "none" : "grid";
+      calcAndDraw();
+    });
+    $("dualLayer").addEventListener("change", () => {
+      syncTerminalSides("startSide");
+      layerViaPos.userSet = false;
+      calcAndDraw();
+    });
+    $("startSide").addEventListener("change", () => {
+      syncTerminalSides("startSide");
+      layerViaPos.userSet = false;
+      calcAndDraw();
+    });
+    $("endSide").addEventListener("change", () => {
+      syncTerminalSides("endSide");
+      layerViaPos.userSet = false;
+      calcAndDraw();
+    });
+    $("shape").addEventListener("change", () => {
+      syncShapeControls();
+      startPos.userSet = false;
+      innerStartPos.userSet = false;
+      layerViaPos.userSet = false;
+      calcAndDraw();
+    });
+    $("btnSvg").addEventListener("click", exportSvg);
+    $("btnDxf").addEventListener("click", exportDxf);
+    $("btnEasy").addEventListener("click", exportEasyeda);
+
+    const svg = $("coilSvg");
+    svg.addEventListener("pointerdown", onPointerDown);
+    svg.addEventListener("pointermove", onPointerMove);
+    svg.addEventListener("pointerup", onPointerUp);
+    svg.addEventListener("pointercancel", onPointerUp);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+
+    const stage = document.querySelector(".stage");
+    if (stage) {
+      stage.addEventListener("wheel", onWheel, { passive: false });
+    }
+
+    function setActiveLayerView(value, btn) {
+      activeLayerView = value;
+      ["viewAll", "viewTop", "viewBottom"].forEach((id) => $(id).classList.remove("active"));
+      if (btn) btn.classList.add("active");
+      applyView();
+    }
+    $("viewAll").addEventListener("click", (e) => setActiveLayerView("all", e.currentTarget));
+    $("viewTop").addEventListener("click", (e) => setActiveLayerView("top", e.currentTarget));
+    $("viewBottom").addEventListener("click", (e) => setActiveLayerView("bottom", e.currentTarget));
+    $("resetZoom").addEventListener("click", () => { fitToView(); applyView(); });
+    updateZoomInfo();
+
+    let drawFrame = null;
+    function scheduleDraw() {
+      if (drawFrame !== null) cancelAnimationFrame(drawFrame);
+      drawFrame = requestAnimationFrame(() => {
+        drawFrame = null;
+        calcAndDraw();
+      });
+    }
+    ["capPf", "freqMhz", "outerW", "outerH", "circleDia", "widthMm", "gapMm", "chamferMm", "dir", "turnsFixed", "padMm", "gridMm", "copperOz"]
+      .forEach((id) => {
+        $(id).addEventListener("input", scheduleDraw);
+        $(id).addEventListener("change", calcAndDraw);
+      });
+    SETTING_FIELDS.forEach((id) => $(id).addEventListener("input", saveSettings));
+
+    calcAndDraw();
+  </script>
+</body>
+</html>
+
